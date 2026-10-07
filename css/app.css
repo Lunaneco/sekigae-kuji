@@ -313,6 +313,31 @@ body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) satur
   text-shadow: 0 0 16px #ffb703, 0 0 42px #ff6a00, 0 6px 0 #6a2a00;
 }
 .reveal-name.is-hit { animation: nameHit 0.18s cubic-bezier(.15, 1.45, .4, 1) both; }
+.reveal-banner.is-super .reveal-kicker {
+  position: relative;
+  z-index: 2;
+  color: #fff;
+  font-size: clamp(1rem, 2.4vw, 1.45rem);
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 10px #ffb000, 0 2px 0 #3a1600;
+}
+.reveal-banner.is-super .reveal-name {
+  font-size: clamp(3rem, 7.5vw, 6.4rem);
+  letter-spacing: 0.06em;
+  transform-origin: center top;
+  text-shadow: 0 0 10px #fff, 0 0 26px #ffd36a, 0 0 56px #ff5a00, 0 6px 0 #5a2200;
+}
+.reveal-banner.is-super .reveal-name.is-hit { animation: superName 0.45s cubic-bezier(.15, 1.55, .3, 1) both; }
+body.is-reveal .seat.is-calling.is-finale {
+  animation: superPulse 0.16s ease-in-out infinite;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 12px #ffb000, 0 0 52px 18px rgba(255, 70, 0, 0.95);
+}
+body.is-reveal .seat.is-slam.is-finale { animation: superSlam 0.72s cubic-bezier(.12, 1.6, .3, 1) both; }
+body.is-reveal .seat.is-slam.is-finale::after {
+  border-width: 5px;
+  border-color: #fff;
+  animation: superRing 0.9s ease-out both;
+}
 #skipCeremony {
   pointer-events: auto;
   position: absolute;
@@ -350,6 +375,7 @@ body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) satur
   animation: stampIn 0.35s cubic-bezier(.2, 1.4, .3, 1) both;
 }
 .is-shaking { animation: shake 0.4s linear; }
+.is-shaking-hard { animation: shakeHard 0.72s linear; }
 
 @keyframes slam { from { transform: scale(1.7) rotate(-6deg); filter: brightness(2.4); } to { transform: none; filter: none; } }
 @keyframes slamTitle { from { transform: scale(1.8); filter: blur(8px); opacity: 0; } to { transform: none; filter: none; opacity: 1; } }
@@ -359,6 +385,28 @@ body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) satur
   50% { transform: scale(1.22); }
 }
 @keyframes ringOut { from { opacity: 1; transform: scale(0.72); } to { opacity: 0; transform: scale(1.65); } }
+@keyframes superName {
+  0% { transform: scale(1.28); filter: brightness(2.4); }
+  50% { transform: scale(0.96); filter: brightness(1.25); }
+  100% { transform: none; filter: none; }
+}
+@keyframes superPulse {
+  0%, 100% { transform: scale(1.12) rotate(-2deg); }
+  50% { transform: scale(1.4) rotate(2deg); }
+}
+@keyframes superSlam {
+  0% { transform: scale(2.15) rotate(-8deg); filter: brightness(2.8); }
+  55% { transform: scale(0.86) rotate(3deg); filter: brightness(1.5); }
+  100% { transform: none; filter: none; }
+}
+@keyframes superRing { from { opacity: 1; transform: scale(0.55); } to { opacity: 0; transform: scale(2.7); } }
+@keyframes shakeHard {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-12px, 5px); }
+  32% { transform: translate(14px, -7px); }
+  48% { transform: translate(-9px, 4px); }
+  70% { transform: translate(7px, -3px); }
+}
 @keyframes boomIn { to { opacity: 1; } }
 @keyframes goldFlash { from { opacity: 1; } to { opacity: 0; } }
 @keyframes stampIn { from { transform: translate(-50%, -50%) scale(1.6) rotate(-12deg); opacity: 0; } to { opacity: 1; } }

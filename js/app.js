@@ -875,13 +875,33 @@
     }
     return list;
   }
+  function seatPos(seat) {
+    var match = /^r(\d+)c(\d+)$/.exec(seat.dataset.seat || "");
+    if (!match) return { row: -1, col: -1 };
+    return { row: Number(match[1]), col: Number(match[2]) };
+  }
+  function showOrder(nodes) {
+    var list = [].slice.call(nodes);
+    var finale = null;
+    var best = null;
+    list.forEach(function (seat) {
+      var pos = seatPos(seat);
+      if (!best || pos.row > best.row || (pos.row === best.row && pos.col > best.col)) {
+        best = pos;
+        finale = seat;
+      }
+    });
+    var rest = shuffleNodes(list.filter(function (seat) { return seat !== finale; }));
+    if (finale) rest.push(finale);
+    return rest;
+  }
   function showPace(index, total) {
     var t = total <= 1 ? 1 : index / (total - 1);
-    var charge = 440 - t * 240;
-    var hold = 540 - t * 280;
-    if (total > 28) { charge *= 0.75; hold *= 0.75; }
-    if (total > 45) { charge *= 0.75; hold *= 0.75; }
-    return { charge: Math.max(160, Math.round(charge)), hold: Math.max(320, Math.round(hold)) };
+    var name = 560 - t * 200;
+    var hold = 420 - t * 120;
+    if (total > 28) { name *= 0.75; hold *= 0.75; }
+    if (total > 45) { name *= 0.75; hold *= 0.75; }
+    return { name: Math.max(320, Math.round(name)), hold: Math.max(260, Math.round(hold)) };
   }
   function seatPlace(seat) {
     var parts = String(seat.title || "").split("、");
@@ -922,16 +942,20 @@
     void flashEl.offsetWidth;
     flashEl.classList.add("on");
   }
-  function shakeStage() {
+  function shakeStage(hard) {
     var panel = document.querySelector(".room-panel");
     if (!panel) return;
-    panel.classList.remove("is-shaking");
+    panel.classList.remove("is-shaking", "is-shaking-hard");
     void panel.offsetWidth;
-    panel.classList.add("is-shaking");
+    panel.classList.add(hard ? "is-shaking-hard" : "is-shaking");
+  }
+  function setBannerSuper(on) {
+    var banner = document.querySelector(".reveal-banner");
+    if (banner) banner.classList.toggle("is-super", !!on);
   }
   function runShow() {
     return new Promise(function (resolve) {
-      var seats = shuffleNodes([].slice.call(document.querySelectorAll(".seat[data-student]")));
+      var seats = showOrder(document.querySelectorAll(".seat[data-student]"));
       var step = -1;
       var timer = 0;
       var closed = false;
@@ -943,7 +967,8 @@
         document.getElementById("ceremony").hidden = true;
         document.body.classList.remove("is-reveal");
         var panel = document.querySelector(".room-panel");
-        if (panel) panel.classList.remove("is-shaking");
+        if (panel) panel.classList.remove("is-shaking", "is-shaking-hard");
+        setBannerSuper(false);
         document.querySelectorAll(".decide-stamp").forEach(function (el) { el.remove(); });
         resolve();
       }
@@ -954,7 +979,7 @@
       fitShowChart();
       document.getElementById("ceremony").hidden = false;
       startFx();
-      setCopy("席替え", "一人ずつ");
+      setCopy("席替え", "名前、それから席");
       thud(78);
       burstAt(window.innerWidth * 0.5, 92, 90);
       function next() {
@@ -962,6 +987,7 @@
         if (step >= 0 && seats[step]) seats[step].classList.remove("is-calling");
         step += 1;
         if (step >= seats.length) {
+          setBannerSuper(false);
           setCopy("決定", seats.length ? seats.length + "人" : "");
           stampDecide();
           burstAt(window.innerWidth * 0.5, window.innerHeight * 0.42, 180);
@@ -972,22 +998,42 @@
           return;
         }
         var seat = seats[step];
-        var pace = showPace(step, seats.length);
-        seat.classList.add("is-calling");
-        setCopy("？", seatPlace(seat) + "　" + (step + 1) + " / " + seats.length);
-        charge();
+        var finale = step === seats.length - 1;
+        var pace = finale ? { name: 980, hold: 1200 } : showPace(step, seats.length);
+        var count = (step + 1) + " / " + seats.length;
+        setBannerSuper(finale);
+        setCopy(seatLabel(seat), finale ? "最後の一人　" + count : count);
+        if (finale) {
+          burstAt(window.innerWidth * 0.5, 86, 150);
+          flashOnce();
+          shakeStage(true);
+          chargeSuper();
+        } else charge();
         timer = setTimeout(function () {
           if (closed) return;
-          seat.classList.remove("is-secret", "is-calling");
-          seat.classList.add("is-slam");
-          setCopy(seatLabel(seat), seatPlace(seat) + "　" + (step + 1) + " / " + seats.length);
-          var rect = seat.getBoundingClientRect();
-          burstAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 78);
-          flashOnce();
-          shakeStage();
-          thud(150 + Math.min(step, 18) * 8);
-          timer = setTimeout(next, pace.hold);
-        }, pace.charge);
+          seat.classList.add("is-calling");
+          if (finale) seat.classList.add("is-finale");
+          setCopy(seatLabel(seat), (finale ? "一番うしろ　" : "") + seatPlace(seat) + "　" + count);
+          if (finale) chargeSuper();
+          timer = setTimeout(function () {
+            if (closed) return;
+            seat.classList.remove("is-secret", "is-calling");
+            seat.classList.add("is-slam");
+            var rect = seat.getBoundingClientRect();
+            var x = rect.left + rect.width / 2;
+            var y = rect.top + rect.height / 2;
+            burstAt(x, y, finale ? 170 : 78);
+            flashOnce();
+            shakeStage(finale);
+            thud(finale ? 92 : 150 + Math.min(step, 18) * 8);
+            if (finale) {
+              burstAt(rect.left, rect.top, 70);
+              burstAt(rect.right, rect.bottom, 70);
+              timer = setTimeout(function () { if (!closed) flashOnce(); }, 180);
+            }
+            timer = setTimeout(next, pace.hold);
+          }, finale ? 460 : 180);
+        }, pace.name);
       }
       timer = setTimeout(next, 780);
     });
@@ -1037,6 +1083,23 @@
       gain.connect(ctx.destination);
       osc.start(ctx.currentTime + delay);
       osc.stop(ctx.currentTime + delay + 0.08);
+    });
+  }
+  function chargeSuper() {
+    var ctx = audio();
+    if (!ctx) return;
+    [0, 0.07, 0.14, 0.22, 0.32, 0.44].forEach(function (delay, index) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = index < 4 ? "square" : "triangle";
+      osc.frequency.setValueAtTime(180 + index * 90, ctx.currentTime + delay);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(index < 4 ? 0.05 : 0.16, ctx.currentTime + delay + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.13);
     });
   }
   function startFx() {
