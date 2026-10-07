@@ -225,7 +225,7 @@
       { hpt: 58, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] },
     ];
     grid.lines.forEach(function (line) {
-      var cells = [{ col: 1, value: line.row + 1 + "列目", style: 1 }];
+      var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
       line.cells.forEach(function (cell, index) {
         var col = index + 2;
         if (cell.type === "pad") return;
@@ -258,7 +258,7 @@
   }
 
   function listModel(list) {
-    var header = ["列（前から）", "向かって左から", "先生から左から", "出席番号", "氏名", "決まり方"];
+    var header = ["行（前から）", "列（向かって左から）", "列（先生から左から）", "出席番号", "氏名", "決まり方"];
     var rows = [{
       hpt: 22,
       cells: header.map(function (value, index) { return { col: index + 1, value: value, style: 8 }; }),

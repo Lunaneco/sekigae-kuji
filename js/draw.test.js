@@ -36,6 +36,8 @@ check("36席6列", S.distributeSeats(36, 6).rows.join() === "6,6,6,6,6,6");
 check("37席はうしろが増える", S.distributeSeats(37, 6).rows.join() === "6,6,6,6,6,7");
 check("席が列より少ない", S.distributeSeats(5, 8).rows.join() === "1,1,1,1,1");
 check("1列20席を超えない", S.distributeSeats(100, 2).ok === false);
+check("4行6列", S.gridSeats(4, 6).rows.join() === "6,6,6,6");
+check("20行20列まで", S.gridSeats(20, 20).ok === true && S.gridSeats(21, 1).ok === false && S.gridSeats(1, 21).ok === false);
 
 const centered = S.buildChartGrid([2, 4], {});
 check("短い列は中央", centered.maxSlots === 4 && centered.lines[0].cells.map((c) => c.type === "seat" ? c.col : "-").join() === "-,0,1,-");

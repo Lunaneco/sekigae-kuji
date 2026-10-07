@@ -66,7 +66,7 @@
     grid.lines.forEach(function (line) {
       var row = document.createElement("div");
       row.className = "seat-row";
-      row.appendChild(cell("div", "row-label", line.row + 1 + "列目"));
+      row.appendChild(cell("div", "row-label", line.row + 1 + "行目"));
       var lineEl = document.createElement("div");
       lineEl.className = "seat-line";
       line.cells.forEach(function (item) {
@@ -109,7 +109,7 @@
       extra.appendChild(cell("h2", "", "一覧"));
       var table = document.createElement("table");
       var head = document.createElement("tr");
-      ["列（前から）", "向かって左から", "先生から左から", "出席番号", "氏名"].forEach(function (label) {
+      ["行（前から）", "列（向かって左から）", "列（先生から左から）", "出席番号", "氏名"].forEach(function (label) {
         head.appendChild(cell("th", "", label));
       });
       table.appendChild(head);

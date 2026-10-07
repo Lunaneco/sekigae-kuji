@@ -111,20 +111,33 @@
   total = total | 0;
   rowCount = rowCount | 0;
   if (total < 1) return { ok: false, error: "座席数は1以上にしてください。", rows: [] };
-  if (rowCount < 1) return { ok: false, error: "列の数は1以上にしてください。", rows: [] };
+  if (rowCount < 1) return { ok: false, error: "行の数は1以上にしてください。", rows: [] };
   if (total > 400) return { ok: false, error: "座席数は400席までです。", rows: [] };
-  if (rowCount > 20) return { ok: false, error: "列は20列までです。", rows: [] };
+  if (rowCount > 20) return { ok: false, error: "行は20行までです。", rows: [] };
   if (total < rowCount) rowCount = total;
   var base = Math.floor(total / rowCount);
   var extra = total % rowCount;
   if (base + (extra ? 1 : 0) > 20) {
-    return { ok: false, error: "1列が20席を超えます。列の数を増やしてください。", rows: [] };
+    return { ok: false, error: "1行が20席を超えます。行の数を増やしてください。", rows: [] };
   }
   var rows = [];
   var i;
   for (i = 0; i < rowCount; i += 1) rows.push(base + (i >= rowCount - extra ? 1 : 0));
   return { ok: true, error: "", rows: rows };
 }
+
+  function gridSeats(rowCount, colCount) {
+    rowCount = rowCount | 0;
+    colCount = colCount | 0;
+    if (rowCount < 1 || colCount < 1) return { ok: false, error: "行と列は1以上にしてください。", rows: [] };
+    if (rowCount > 20) return { ok: false, error: "行は20行までです。", rows: [] };
+    if (colCount > 20) return { ok: false, error: "列は20列までです。", rows: [] };
+    if (rowCount * colCount > 400) return { ok: false, error: "座席数は400席までです。", rows: [] };
+    var rows = [];
+    var i;
+    for (i = 0; i < rowCount; i += 1) rows.push(colCount);
+    return { ok: true, error: "", rows: rows };
+  }
 
 function makeSeats(rowCounts) {
     var seats = [];
@@ -409,6 +422,7 @@ function makeSeats(rowCounts) {
     guessMapping: guessMapping,
     extractPeople: extractPeople,
     distributeSeats: distributeSeats,
+    gridSeats: gridSeats,
     makeSeats: makeSeats,
     buildChartGrid: buildChartGrid,
     shuffle: shuffle,

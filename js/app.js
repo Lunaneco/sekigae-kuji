@@ -149,7 +149,9 @@
 
   function describe(rows) {
     var total = rows.reduce(function (sum, n) { return sum + n; }, 0);
-    return "合計" + total + "席 / " + rows.length + "列";
+    var even = rows.length > 0 && rows.every(function (n) { return n === rows[0]; });
+    if (even) return rows.length + "行 × " + rows[0] + "列（合計" + total + "席）";
+    return "合計" + total + "席 / " + rows.length + "行";
   }
   function problems() {
     var seats = seatsNow();
@@ -264,7 +266,7 @@
       row.className = "seat-row";
       var label = document.createElement("div");
       label.className = "row-label";
-      label.textContent = line.row + 1 + "列目";
+      label.textContent = line.row + 1 + "行目";
       var lineEl = document.createElement("div");
       lineEl.className = "seat-line";
       line.cells.forEach(function (cell) {
@@ -336,7 +338,7 @@
     var how = state.assignment ? howOf(seatId, studentId) : "";
     tag.textContent = how === "固定" || how === "手直し" || how.indexOf("限定") === 0 ? (how.indexOf("限定") === 0 ? "限定" : how) : "";
     button.append(coord, num, name, tag);
-    button.title = (row + 1) + "列目、" + (state.teacherView ? "教卓から左" : "向かって左から") + shown + (student ? "、" + student.number + " " + student.name : "");
+    button.title = (row + 1) + "行目、" + (state.teacherView ? "教卓から左" : "向かって左から") + shown + "列" + (student ? "、" + student.number + " " + student.name : "");
     return button;
   }
 
@@ -403,7 +405,7 @@
       var line = document.createElement("div");
       line.className = "row-edit";
       var label = document.createElement("span");
-      label.textContent = index + 1 + "列目（前から）";
+      label.textContent = index + 1 + "行目（前から）";
       var input = document.createElement("input");
       input.className = "row-count";
       input.type = "number";
@@ -426,7 +428,14 @@
     });
   }
   function proposedRows() {
-    if (document.getElementById("layoutMode").value === "total") {
+    var mode = document.getElementById("layoutMode").value;
+    if (mode === "grid") {
+      return Sekigae.gridSeats(
+        clampInt(document.getElementById("gridRows").value, 1, 20),
+        clampInt(document.getElementById("gridCols").value, 1, 20)
+      );
+    }
+    if (mode === "total") {
       return Sekigae.distributeSeats(
         clampInt(document.getElementById("totalSeats").value, 1, 400),
         clampInt(document.getElementById("rowCount").value, 1, 20)
@@ -443,9 +452,10 @@
       : next.error;
   }
   function syncLayoutPanels() {
-    var custom = document.getElementById("layoutMode").value === "rows";
-    document.getElementById("totalBox").hidden = custom;
-    document.getElementById("customBox").hidden = !custom;
+    var mode = document.getElementById("layoutMode").value;
+    document.getElementById("gridBox").hidden = mode !== "grid";
+    document.getElementById("totalBox").hidden = mode !== "total";
+    document.getElementById("customBox").hidden = mode !== "rows";
   }
 
   function onPersonEdit(id, field, value) {
@@ -1069,7 +1079,7 @@
       if (document.getElementById("layoutMode").value === "rows") renderCustomRows(state.rows.slice());
       updateLayoutPreview();
     });
-    ["totalSeats", "rowCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
+    ["gridRows", "gridCols", "totalSeats", "rowCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
     document.getElementById("applyLayout").addEventListener("click", applyLayout);
     document.getElementById("addRow").addEventListener("click", function () {
       var rows = readCustom();
@@ -1188,9 +1198,11 @@
       pending = null;
       localStorage.removeItem(KEY);
       document.getElementById("mapping").hidden = true;
+      document.getElementById("gridRows").value = "4";
+      document.getElementById("gridCols").value = "6";
       document.getElementById("totalSeats").value = "24";
       document.getElementById("rowCount").value = "4";
-      document.getElementById("layoutMode").value = "total";
+      document.getElementById("layoutMode").value = "grid";
       syncLayoutPanels();
       renderCustomRows(state.rows.slice());
       refresh();
@@ -1202,10 +1214,12 @@
 
   load();
   bind();
+  document.getElementById("gridRows").value = String(state.rows.length);
+  document.getElementById("gridCols").value = String(state.rows[0] || 6);
   document.getElementById("totalSeats").value = String(state.rows.reduce(function (sum, n) { return sum + n; }, 0));
   document.getElementById("rowCount").value = String(state.rows.length);
-  var even = state.rows.every(function (n) { return n === state.rows[0]; });
-  document.getElementById("layoutMode").value = even ? "total" : "rows";
+  var even = state.rows.length > 0 && state.rows.every(function (n) { return n === state.rows[0]; });
+  document.getElementById("layoutMode").value = even ? "grid" : "rows";
   syncLayoutPanels();
   renderCustomRows(state.rows.slice());
   refresh();
