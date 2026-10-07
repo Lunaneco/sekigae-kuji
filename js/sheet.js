@@ -18,7 +18,12 @@
     data.students.slice(0, 500).forEach(function (item) {
       var id = cleanId(item && item.id, "s");
       if (!id || !item.name || known[id]) return;
-      known[id] = { id: id, number: String(item.number || "").slice(0, 20), name: String(item.name).slice(0, 80) };
+      known[id] = {
+        id: id,
+        number: String(item.number || "").slice(0, 20),
+        name: String(item.name).slice(0, 80),
+        gender: Sekigae.cleanGender(item.gender)
+      };
       students.push(known[id]);
     });
     var columns = null;
@@ -103,7 +108,8 @@
           fromLeft: String(item.col + 1),
           fromTeacher: String(count - item.col),
           number: student ? student.number : "",
-          name: student ? student.name : ""
+          name: student ? student.name : "",
+          gender: student ? student.gender || "" : ""
         });
       });
       row.appendChild(lineEl);
@@ -118,14 +124,14 @@
       extra.appendChild(cell("h2", "", "一覧"));
       var table = document.createElement("table");
       var head = document.createElement("tr");
-      ["行（前から）", "列（向かって左から）", "列（先生から左から）", "出席番号", "氏名"].forEach(function (label) {
+      ["行（前から）", "列（向かって左から）", "列（先生から左から）", "番号", "名前", "性別"].forEach(function (label) {
         head.appendChild(cell("th", "", label));
       });
       table.appendChild(head);
       list.forEach(function (item) {
         if (!item.name && !item.number) return;
         var tr = document.createElement("tr");
-        [item.row, item.fromLeft, item.fromTeacher, item.number, item.name].forEach(function (value) {
+        [item.row, item.fromLeft, item.fromTeacher, item.number, item.name, item.gender].forEach(function (value) {
           tr.appendChild(cell("td", "", value));
         });
         table.appendChild(tr);
@@ -134,7 +140,7 @@
         var student = state.students[id];
         if (!student) return;
         var tr = document.createElement("tr");
-        ["", "", "", student.number, student.name + "（席なし）"].forEach(function (value) {
+        ["", "", "", student.number, student.name + "（席なし）", student.gender || ""].forEach(function (value) {
           tr.appendChild(cell("td", "", value));
         });
         table.appendChild(tr);

@@ -24,7 +24,7 @@
     return {
       v: 1, students: [], rows: [6, 6, 6, 6], columns: null, pins: [], groups: [],
       assignment: null, unseated: [], history: null, aisle: false, teacherView: false,
-      sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
+      avoidOpposite: false, sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
     };
   }
 
@@ -99,7 +99,12 @@
       data.students.slice(0, 500).forEach(function (item) {
         var id = cleanId(item && item.id, "s");
         if (!id || !item.name) return;
-        next.students.push({ id: id, number: String(item.number || "").slice(0, 20), name: String(item.name).slice(0, 80) });
+        next.students.push({
+          id: id,
+          number: String(item.number || "").slice(0, 20),
+          name: String(item.name).slice(0, 80),
+          gender: Sekigae.cleanGender(item.gender)
+        });
         maxId = Math.max(maxId, parseInt(id.slice(1), 10) || 0);
       });
     }
@@ -140,6 +145,7 @@
     next.unseated = Array.isArray(data.unseated) ? data.unseated.filter(function (id) { return knownS[id]; }) : [];
     next.aisle = !!data.aisle;
     next.teacherView = !!data.teacherView;
+    next.avoidOpposite = !!data.avoidOpposite;
     next.sound = data.sound !== false;
     next.nextId = Math.max(maxId, data.nextId | 0);
     state = next;
@@ -176,6 +182,10 @@
     var bits = ["名簿 " + state.students.length + "人", describe(state.rows, state.columns)];
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
+    var oppositeLeft = state.avoidOpposite && state.assignment
+      ? Sekigae.countOpposite(state.students, state.assignment, Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns }))
+      : 0;
+    if (oppositeLeft > 0) bits.push("周りが異性だけの席が" + oppositeLeft + "人分残っています");
     document.getElementById("status").textContent = bits.concat(report.errors, report.warnings).join(" / ");
     document.getElementById("btnDraw").disabled = report.errors.length > 0 || busy;
     document.getElementById("btnQuiet").disabled = report.errors.length > 0 || busy;
@@ -185,6 +195,7 @@
     poster.setAttribute("aria-pressed", state.teacherView ? "false" : "true");
     teacher.setAttribute("aria-pressed", state.teacherView ? "true" : "false");
     document.getElementById("aisle").checked = state.aisle;
+    document.getElementById("avoidOpposite").checked = state.avoidOpposite;
     document.getElementById("pinMode").setAttribute("aria-pressed", state.mode === "pin" ? "true" : "false");
     document.getElementById("swapMode").setAttribute("aria-pressed", state.mode === "swap" ? "true" : "false");
     document.getElementById("btnSound").setAttribute("aria-pressed", state.sound ? "true" : "false");
@@ -209,14 +220,24 @@
       name.value = student.name;
       name.maxLength = 80;
       name.setAttribute("aria-label", "名前");
+      var gender = document.createElement("select");
+      gender.setAttribute("aria-label", "性別");
+      [["", "—"], ["男", "男"], ["女", "女"]].forEach(function (pair) {
+        var option = document.createElement("option");
+        option.value = pair[0];
+        option.textContent = pair[1];
+        gender.appendChild(option);
+      });
+      gender.value = student.gender === "男" || student.gender === "女" ? student.gender : "";
       var remove = document.createElement("button");
       remove.type = "button";
       remove.textContent = "削除";
       remove.dataset.removeStudent = student.id;
       number.addEventListener("input", function () { onPersonEdit(student.id, "number", number.value); });
       name.addEventListener("input", function () { onPersonEdit(student.id, "name", name.value); });
-      item.append(number, name, remove);
-      var hay = (student.number + " " + student.name).toLowerCase();
+      gender.addEventListener("change", function () { onPersonEdit(student.id, "gender", gender.value); });
+      item.append(number, name, gender, remove);
+      var hay = (student.number + " " + student.name + " " + (student.gender || "")).toLowerCase();
       item.hidden = !!filter && hay.indexOf(filter) < 0;
       list.appendChild(item);
     });
@@ -244,7 +265,7 @@
       if (state.groups.some(function (group) { return group.studentIds.indexOf(student.id) >= 0; })) return;
       var option = document.createElement("option");
       option.value = student.id;
-      option.textContent = (student.number ? student.number + " " : "") + student.name;
+      option.textContent = (student.number ? student.number + " " : "") + student.name + (student.gender ? "（" + student.gender + "）" : "");
       select.appendChild(option);
     });
     if (current) select.value = current;
@@ -524,14 +545,17 @@
   function onPersonEdit(id, field, value) {
     var student = studentById(id);
     if (!student) return;
-    student[field] = String(value).slice(0, field === "name" ? 80 : 20);
-    document.querySelectorAll(".seat").forEach(function (seat) {
-      if (seat.dataset.student !== id) return;
-      var node = seat.querySelector(field === "name" ? ".seat-name" : ".seat-num");
-      if (node) node.textContent = student[field];
-    });
+    if (field === "gender") student.gender = Sekigae.cleanGender(value);
+    else student[field] = String(value).slice(0, field === "name" ? 80 : 20);
+    if (field === "number" || field === "name") {
+      document.querySelectorAll(".seat").forEach(function (seat) {
+        if (seat.dataset.student !== id) return;
+        var node = seat.querySelector(field === "name" ? ".seat-name" : ".seat-num");
+        if (node) node.textContent = student[field];
+      });
+    }
     var option = document.querySelector('#pinStudent option[value="' + id + '"]');
-    if (option) option.textContent = (student.number ? student.number + " " : "") + student.name;
+    if (option) option.textContent = (student.number ? student.number + " " : "") + student.name + (student.gender ? "（" + student.gender + "）" : "");
     save();
     renderStatus();
   }
@@ -607,7 +631,12 @@
     people.slice(0, 500 - state.students.length).forEach(function (person) {
       if (!person.name) return;
       state.nextId += 1;
-      state.students.push({ id: "s" + state.nextId, number: String(person.number || "").slice(0, 20), name: String(person.name).slice(0, 80) });
+      state.students.push({
+        id: "s" + state.nextId,
+        number: String(person.number || "").slice(0, 20),
+        name: String(person.name).slice(0, 80),
+        gender: Sekigae.cleanGender(person.gender)
+      });
     });
     refresh();
   }
@@ -719,13 +748,14 @@
         fromTeacher: String(span - seat.col),
         number: student ? student.number : "",
         name: student ? student.name : "",
+        gender: student ? student.gender || "" : "",
         how: howOf(seat.id, studentId)
       });
     });
     state.unseated.forEach(function (id) {
       var student = studentById(id);
       if (!student) return;
-      list.push({ rowLabel: "", fromLeft: "", fromTeacher: "", number: student.number, name: student.name, how: "席なし" });
+      list.push({ rowLabel: "", fromLeft: "", fromTeacher: "", number: student.number, name: student.name, gender: student.gender || "", how: "席なし" });
     });
     return list;
   }
@@ -767,7 +797,12 @@
     var report = problems();
     if (report.errors.length) { flash(report.errors[0]); return; }
     if (state.assignment && !window.confirm("いまの結果を消して、もう一度引きます。")) return;
-    var result = Sekigae.draw(state.students, report.seats, state.pins, state.groups);
+    var drawOptions = {};
+    if (state.avoidOpposite) {
+      drawOptions.avoidOpposite = true;
+      drawOptions.neighbors = Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns });
+    }
+    var result = Sekigae.draw(state.students, report.seats, state.pins, state.groups, null, drawOptions);
     if (!result.ok) { flash(result.errors[0] || "引けませんでした。"); return; }
     remember();
     state.assignment = result.assignment;
@@ -776,7 +811,7 @@
     save();
     renderRoom();
     renderStatus();
-    if (!withShow || reduceMotion()) { flash("席が決まりました。"); return; }
+    if (!withShow || reduceMotion()) { flash(resultMessage()); return; }
     busy = true;
     renderStatus();
     document.querySelectorAll(".seat").forEach(function (seat) { seat.classList.add("is-secret"); });
@@ -789,8 +824,15 @@
     }).then(function () {
       busy = false;
       renderStatus();
-      flash("席が決まりました。");
+      flash(resultMessage());
     });
+  }
+
+  function resultMessage() {
+    if (!state.avoidOpposite || !state.assignment) return "席が決まりました。";
+    var left = Sekigae.countOpposite(state.students, state.assignment, Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns }));
+    if (left > 0) return "席が決まりました。周りが異性だけの席が" + left + "人分残っています。";
+    return "席が決まりました。";
   }
 
   function playVideo(video) {
@@ -967,20 +1009,26 @@
     var cols = Sekigae.columnCount(matrix);
     var numberSel = document.getElementById("colNumber");
     var nameSel = document.getElementById("colName");
+    var genderSel = document.getElementById("colGender");
     var headerSel = document.getElementById("headerRow");
     numberSel.textContent = "";
     nameSel.textContent = "";
+    genderSel.textContent = "";
     headerSel.textContent = "";
     var blank = document.createElement("option");
     blank.value = "-1";
     blank.textContent = "見出しなし";
     headerSel.appendChild(blank);
+    var unused = document.createElement("option");
+    unused.value = "-1";
+    unused.textContent = "使わない";
+    genderSel.appendChild(unused);
     for (var c = 0; c < Math.min(cols, 40); c += 1) {
       var sample = "";
       for (var r = 0; r < Math.min(matrix.length, 6); r += 1) {
         if (matrix[r] && String(matrix[r][c] || "").trim()) { sample = String(matrix[r][c]).slice(0, 12); break; }
       }
-      [numberSel, nameSel].forEach(function (select) {
+      [numberSel, nameSel, genderSel].forEach(function (select) {
         var option = document.createElement("option");
         option.value = String(c);
         option.textContent = columnLabel(c) + (sample ? "：" + sample : "");
@@ -995,6 +1043,7 @@
     }
     numberSel.value = String(guess.numberCol);
     nameSel.value = String(Math.min(guess.nameCol, cols - 1));
+    genderSel.value = String(guess.genderCol >= 0 ? guess.genderCol : -1);
     headerSel.value = String(guess.headerRow);
     updatePreview();
   }
@@ -1002,19 +1051,28 @@
     var box = document.getElementById("preview");
     box.textContent = "";
     var matrix = matrixOf(document.getElementById("sheet").value);
-    var extracted = Sekigae.extractPeople(matrix, Number(document.getElementById("headerRow").value), Number(document.getElementById("colNumber").value), Number(document.getElementById("colName").value));
+    var extracted = Sekigae.extractPeople(matrix, Number(document.getElementById("headerRow").value), Number(document.getElementById("colNumber").value), Number(document.getElementById("colName").value), Number(document.getElementById("colGender").value));
     var lead = document.createElement("p");
     lead.className = "hint";
     lead.textContent = extracted.people.length + "人読み取れます" + (extracted.skipped.length ? "。名前が空の行を飛ばします。" : "。");
     var table = document.createElement("table");
     table.className = "preview-table";
+    var head = document.createElement("tr");
+    ["番号", "名前", "性別"].forEach(function (label) {
+      var cell = document.createElement("th");
+      cell.textContent = label;
+      head.appendChild(cell);
+    });
+    table.appendChild(head);
     extracted.people.slice(0, 8).forEach(function (person) {
       var row = document.createElement("tr");
       var num = document.createElement("td");
       var name = document.createElement("td");
+      var gender = document.createElement("td");
       num.textContent = person.number;
       name.textContent = person.name;
-      row.append(num, name);
+      gender.textContent = person.gender;
+      row.append(num, name, gender);
       table.appendChild(row);
     });
     box.append(lead, table);
@@ -1052,8 +1110,12 @@
       var matrix = matrixOf(document.getElementById("sheet").value);
       var numberCol = Number(document.getElementById("colNumber").value);
       var nameCol = Number(document.getElementById("colName").value);
-      if (numberCol === nameCol) { flash("番号と名前は別の列にしてください。"); return; }
-      var extracted = Sekigae.extractPeople(matrix, Number(document.getElementById("headerRow").value), numberCol, nameCol);
+      var genderCol = Number(document.getElementById("colGender").value);
+      if (numberCol === nameCol || (genderCol >= 0 && (genderCol === numberCol || genderCol === nameCol))) {
+        flash("番号、名前、性別は別の列にしてください。");
+        return;
+      }
+      var extracted = Sekigae.extractPeople(matrix, Number(document.getElementById("headerRow").value), numberCol, nameCol, genderCol);
       if (!extracted.people.length) { flash("名前が読み取れません。列を確認してください。"); return; }
       addPeople(extracted.people, replace);
       document.getElementById("mapping").hidden = true;
@@ -1065,7 +1127,7 @@
   }
 
   function templateFile() {
-    var sheet = XLSX.utils.aoa_to_sheet([["出席番号", "氏名"], ["1", "青葉 湊"]]);
+    var sheet = XLSX.utils.aoa_to_sheet([["番号", "名前", "性別"], ["1", "青葉 湊", "女"]]);
     var book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "名簿");
     XLSX.writeFile(book, "名簿テンプレート.xlsx");
@@ -1089,7 +1151,7 @@
     window.addEventListener("dragover", function (event) { event.preventDefault(); });
     window.addEventListener("drop", function (event) { event.preventDefault(); });
     document.getElementById("sheet").addEventListener("change", function () { try { fillMapping(); } catch (err) { flash("このシートは読み取れません。"); } });
-    ["colNumber", "colName", "headerRow"].forEach(function (id) {
+    ["colNumber", "colName", "colGender", "headerRow"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function () { try { updatePreview(); } catch (err) { flash("プレビューを更新できません。"); } });
     });
     document.getElementById("importReplace").addEventListener("click", function () { commitImport(true); });
@@ -1109,14 +1171,18 @@
       event.preventDefault();
       var name = document.getElementById("addName").value.trim();
       if (!name) return;
-      addPeople([{ number: document.getElementById("addNumber").value.trim(), name: name }], false);
+      addPeople([{
+        number: document.getElementById("addNumber").value.trim(),
+        name: name,
+        gender: document.getElementById("addGender").value
+      }], false);
       event.target.reset();
     });
     document.getElementById("roster").addEventListener("click", function (event) {
       var remove = event.target.closest("[data-remove-student]");
       if (remove) { removeStudent(remove.dataset.removeStudent); return; }
       var person = event.target.closest(".person");
-      if (!person || event.target.closest("input, button")) return;
+      if (!person || event.target.closest("input, button, select")) return;
       if (!(state.mode === "group" && state.draft)) return;
       var id = person.dataset.id;
       if (heldStudent(id) && state.draft.studentIds.indexOf(id) < 0) { flash("この人はすでに指定されています。"); return; }
@@ -1257,6 +1323,11 @@
       renderStatus();
       save();
     });
+    document.getElementById("avoidOpposite").addEventListener("change", function (event) {
+      state.avoidOpposite = event.target.checked;
+      renderStatus();
+      save();
+    });
     document.getElementById("btnDraw").addEventListener("click", function () { draw(true); });
     document.getElementById("btnQuiet").addEventListener("click", function () { draw(false); });
     document.getElementById("openPoster").addEventListener("click", function (event) {
@@ -1271,7 +1342,7 @@
     document.getElementById("btnPrint").addEventListener("click", function () { window.print(); });
     document.getElementById("btnSample").addEventListener("click", function () {
       if (state.students.length && !window.confirm("いまの名簿をサンプルに入れ替えます。")) return;
-      addPeople(SAMPLE.map(function (row) { return { number: row[0], name: row[1] }; }), true);
+      addPeople(SAMPLE.map(function (row, index) { return { number: row[0], name: row[1], gender: index % 2 ? "男" : "女" }; }), true);
     });
     document.getElementById("btnTemplate").addEventListener("click", templateFile);
     document.getElementById("btnSound").addEventListener("click", function () { state.sound = !state.sound; renderStatus(); save(); });

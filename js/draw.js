@@ -42,8 +42,23 @@
   function isNameHeader(value) {
     var key = normHeader(value);
     if (!key || key.indexOf("ふりがな") >= 0 || key.indexOf("フリガナ") >= 0) return false;
+    if (key.indexOf("性別") >= 0) return false;
     if (NAME_KEYS[key]) return true;
     return key.indexOf("氏名") >= 0 || key.indexOf("名前") >= 0;
+  }
+
+  function isGenderHeader(value) {
+    var key = normHeader(value);
+    if (!key) return false;
+    return key === "性別" || key === "男女" || key === "gender" || key === "sex" || key.indexOf("性別") >= 0;
+  }
+
+  function cleanGender(value) {
+    var key = normHeader(value);
+    if (!key || key.length > 8) return "";
+    if (key === "男" || key === "男子" || key === "男性" || key === "男の子" || key === "男児" || key === "m" || key === "male" || key === "boy") return "男";
+    if (key === "女" || key === "女子" || key === "女性" || key === "女の子" || key === "女児" || key === "f" || key === "female" || key === "girl") return "女";
+    return "";
   }
 
   function cleanNumber(value) {
@@ -67,15 +82,17 @@
       var row = rows[r] || [];
       var numberCol = -1;
       var nameCol = -1;
+      var genderCol = -1;
       for (c = 0; c < row.length; c += 1) {
         if (numberCol < 0 && isNumberHeader(row[c])) numberCol = c;
         else if (nameCol < 0 && isNameHeader(row[c])) nameCol = c;
+        else if (genderCol < 0 && isGenderHeader(row[c])) genderCol = c;
       }
       if (numberCol >= 0 && nameCol >= 0) {
-        return { headerRow: r, numberCol: numberCol, nameCol: nameCol };
+        return { headerRow: r, numberCol: numberCol, nameCol: nameCol, genderCol: genderCol };
       }
     }
-    return { headerRow: -1, numberCol: 0, nameCol: Math.min(1, columnCount(rows) - 1) };
+    return { headerRow: -1, numberCol: 0, nameCol: Math.min(1, columnCount(rows) - 1), genderCol: -1 };
   }
 
   function columnCount(matrix) {
@@ -87,12 +104,13 @@
     return Math.max(max, 1);
   }
 
-  function extractPeople(matrix, headerRow, numberCol, nameCol) {
+  function extractPeople(matrix, headerRow, numberCol, nameCol, genderCol) {
     var rows = Array.isArray(matrix) ? matrix : [];
     var start = headerRow >= 0 ? headerRow + 1 : 0;
     var people = [];
     var skipped = [];
     var r;
+    if (!(genderCol >= 0)) genderCol = -1;
     for (r = start; r < rows.length; r += 1) {
       var row = rows[r] || [];
       var number = cleanNumber(row[numberCol]);
@@ -102,7 +120,7 @@
         skipped.push(r + 1);
         continue;
       }
-      people.push({ number: number, name: name });
+      people.push({ number: number, name: name, gender: genderCol >= 0 ? cleanGender(row[genderCol]) : "" });
     }
     return { people: people, skipped: skipped };
   }
@@ -338,58 +356,242 @@
     return out;
   }
 
-  function draw(students, seats, pins, groups, rng) {
+  function genderMap(students) {
+    var map = {};
+    var i;
+    for (i = 0; i < students.length; i += 1) map[students[i].id] = cleanGender(students[i].gender);
+    return map;
+  }
+
+  function oppositeCount(assignment, neighbors, genders) {
+    if (!neighbors) return 0;
+    var bad = 0;
+    var ids = Object.keys(assignment);
+    var i;
+    var k;
+    for (i = 0; i < ids.length; i += 1) {
+      var seatId = ids[i];
+      var gender = genders[assignment[seatId]];
+      if (gender !== "男" && gender !== "女") continue;
+      var around = neighbors[seatId] || [];
+      var same = 0;
+      var other = 0;
+      for (k = 0; k < around.length; k += 1) {
+        var next = genders[assignment[around[k]]];
+        if (next !== "男" && next !== "女") continue;
+        if (next === gender) same += 1;
+        else other += 1;
+      }
+      if (other > 0 && same === 0) bad += 1;
+    }
+    return bad;
+  }
+
+  function countOpposite(students, assignment, neighbors) {
+    return oppositeCount(assignment || {}, neighbors, genderMap(students || []));
+  }
+
+  function copyAssignment(src) {
+    var out = {};
+    var keys = Object.keys(src);
+    var i;
+    for (i = 0; i < keys.length; i += 1) out[keys[i]] = src[keys[i]];
+    return out;
+  }
+
+  function draw(students, seats, pins, groups, rng, options) {
     var random = rng || Math.random;
+    options = options || {};
     var errors = validate(students, seats, pins, groups);
     if (errors.length) {
-      return { ok: false, errors: errors, assignment: {}, unseated: students.map(function (s) { return s.id; }) };
+      return { ok: false, errors: errors, assignment: {}, unseated: students.map(function (s) { return s.id; }), oppositeLeft: 0 };
     }
 
-    var assignment = {};
-    var usedStudents = {};
-    var reservedSeats = {};
-    var i;
+    var genders = genderMap(students);
+    var neighbors = options.neighbors || null;
 
-    for (i = 0; i < pins.length; i += 1) {
-      assignment[pins[i].seatId] = pins[i].studentId;
-      usedStudents[pins[i].studentId] = 1;
-      reservedSeats[pins[i].seatId] = 1;
-    }
-
-    for (i = 0; i < groups.length; i += 1) {
-      var group = groups[i];
-      var people = shuffle(group.studentIds, random);
-      var seatPool = shuffle(group.seatIds, random);
-      var n = people.length;
-      var k;
-      for (k = 0; k < n; k += 1) {
-        assignment[seatPool[k]] = people[k];
-        usedStudents[people[k]] = 1;
+    function place() {
+      var assignment = {};
+      var usedStudents = {};
+      var reservedSeats = {};
+      var i;
+      for (i = 0; i < pins.length; i += 1) {
+        assignment[pins[i].seatId] = pins[i].studentId;
+        usedStudents[pins[i].studentId] = 1;
+        reservedSeats[pins[i].seatId] = 1;
       }
-      for (k = 0; k < group.seatIds.length; k += 1) reservedSeats[group.seatIds[k]] = 1;
+      for (i = 0; i < groups.length; i += 1) {
+        var group = groups[i];
+        var people = shuffle(group.studentIds, random);
+        var seatPool = shuffle(group.seatIds, random);
+        var n = people.length;
+        var k;
+        for (k = 0; k < n; k += 1) {
+          assignment[seatPool[k]] = people[k];
+          usedStudents[people[k]] = 1;
+        }
+        for (k = 0; k < group.seatIds.length; k += 1) reservedSeats[group.seatIds[k]] = 1;
+      }
+      var restPeople = [];
+      for (i = 0; i < students.length; i += 1) {
+        if (!usedStudents[students[i].id]) restPeople.push(students[i].id);
+      }
+      restPeople = shuffle(restPeople, random);
+      var restSeats = [];
+      for (i = 0; i < seats.length; i += 1) {
+        if (!reservedSeats[seats[i].id]) restSeats.push(seats[i].id);
+      }
+      restSeats = shuffle(restSeats, random);
+      var pairCount = Math.min(restPeople.length, restSeats.length);
+      for (i = 0; i < pairCount; i += 1) assignment[restSeats[i]] = restPeople[i];
+      return { assignment: assignment, unseated: restPeople.slice(pairCount), pools: poolMap(restSeats, groups) };
     }
 
-    var restPeople = [];
-    for (i = 0; i < students.length; i += 1) {
-      if (!usedStudents[students[i].id]) restPeople.push(students[i].id);
+    function poolMap(restSeats, groupList) {
+      var map = {};
+      var i;
+      var k;
+      for (i = 0; i < restSeats.length; i += 1) map[restSeats[i]] = restSeats;
+      for (i = 0; i < groupList.length; i += 1) {
+        var ids = groupList[i].seatIds;
+        for (k = 0; k < ids.length; k += 1) map[ids[k]] = ids;
+      }
+      return map;
     }
-    restPeople = shuffle(restPeople, random);
 
-    var restSeats = [];
-    for (i = 0; i < seats.length; i += 1) {
-      if (!reservedSeats[seats[i].id]) restSeats.push(seats[i].id);
+    function improve(assignment, pools) {
+      var guard = 0;
+      while (guard < 80) {
+        guard += 1;
+        var before = oppositeCount(assignment, neighbors, genders);
+        if (before === 0) return;
+        var ids = Object.keys(assignment);
+        var changed = false;
+        var i;
+        for (i = 0; i < ids.length && !changed; i += 1) {
+          var seatId = ids[Math.floor(random() * ids.length)];
+          var pool = pools[seatId];
+          if (!pool || pool.length < 2) continue;
+          var tries = Math.min(pool.length - 1, 16);
+          var t;
+          for (t = 0; t < tries; t += 1) {
+            var other = pool[Math.floor(random() * pool.length)];
+            if (other === seatId || !assignment[other]) continue;
+            var held = assignment[seatId];
+            assignment[seatId] = assignment[other];
+            assignment[other] = held;
+            if (oppositeCount(assignment, neighbors, genders) < before) {
+              changed = true;
+              break;
+            }
+            assignment[other] = assignment[seatId];
+            assignment[seatId] = held;
+          }
+        }
+        if (!changed) return;
+      }
     }
-    restSeats = shuffle(restSeats, random);
 
-    var pairCount = Math.min(restPeople.length, restSeats.length);
-    for (i = 0; i < pairCount; i += 1) assignment[restSeats[i]] = restPeople[i];
+    function seatPos(id) {
+      var match = /^r(\d+)c(\d+)$/.exec(id);
+      return match ? { row: Number(match[1]), col: Number(match[2]) } : { row: 0, col: 0 };
+    }
 
-    return {
-      ok: true,
-      errors: [],
-      assignment: assignment,
-      unseated: restPeople.slice(pairCount),
-    };
+    function stripe(assignment, pools) {
+      var seen = [];
+      Object.keys(pools).forEach(function (id) {
+        var pool = pools[id];
+        if (seen.indexOf(pool) >= 0) return;
+        seen.push(pool);
+        var pairs = [];
+        var k;
+        for (k = 0; k < pool.length; k += 1) {
+          if (assignment[pool[k]]) pairs.push({ seat: pool[k], person: assignment[pool[k]] });
+        }
+        if (pairs.length < 2) return;
+        pairs.sort(function (a, b) {
+          var pa = seatPos(a.seat);
+          var pb = seatPos(b.seat);
+          if (pa.col !== pb.col) return pa.col - pb.col;
+          return pa.row - pb.row;
+        });
+        var columns = [];
+        var colMap = {};
+        for (k = 0; k < pairs.length; k += 1) {
+          var pos = seatPos(pairs[k].seat);
+          if (!colMap[pos.col]) {
+            colMap[pos.col] = [];
+            columns.push(colMap[pos.col]);
+          }
+          colMap[pos.col].push(pairs[k].seat);
+        }
+        columns = shuffle(columns, random);
+        var seatOrder = [];
+        for (k = 0; k < columns.length; k += 1) seatOrder = seatOrder.concat(columns[k]);
+        var boys = [];
+        var girls = [];
+        var other = [];
+        for (k = 0; k < pairs.length; k += 1) {
+          var g = genders[pairs[k].person];
+          if (g === "男") boys.push(pairs[k].person);
+          else if (g === "女") girls.push(pairs[k].person);
+          else other.push(pairs[k].person);
+        }
+        boys = shuffle(boys, random);
+        girls = shuffle(girls, random);
+        other = shuffle(other, random);
+        var bi = 0;
+        var gi = 0;
+        var oi = 0;
+        var prefer = random() < 0.5 ? "男" : "女";
+        var ordered = [];
+        var lastCol = null;
+        for (k = 0; k < seatOrder.length; k += 1) {
+          var col = seatPos(seatOrder[k]).col;
+          if (col !== lastCol) {
+            lastCol = col;
+            if (prefer === "男" && bi >= boys.length && gi < girls.length) prefer = "女";
+            if (prefer === "女" && gi >= girls.length && bi < boys.length) prefer = "男";
+          }
+          if (prefer === "男" && bi < boys.length) ordered.push(boys[bi++]);
+          else if (prefer === "女" && gi < girls.length) ordered.push(girls[gi++]);
+          else if (bi < boys.length) ordered.push(boys[bi++]);
+          else if (gi < girls.length) ordered.push(girls[gi++]);
+          else ordered.push(other[oi++]);
+        }
+        for (k = 0; k < seatOrder.length; k += 1) assignment[seatOrder[k]] = ordered[k];
+      });
+    }
+
+    function tune(candidate) {
+      improve(candidate.assignment, candidate.pools);
+      var score = oppositeCount(candidate.assignment, neighbors, genders);
+      if (score === 0) return 0;
+      var backup = copyAssignment(candidate.assignment);
+      stripe(candidate.assignment, candidate.pools);
+      improve(candidate.assignment, candidate.pools);
+      var striped = oppositeCount(candidate.assignment, neighbors, genders);
+      if (striped > score) candidate.assignment = backup;
+      return striped < score ? striped : score;
+    }
+
+    var placed = place();
+    if (!options.avoidOpposite || !neighbors) {
+      return { ok: true, errors: [], assignment: placed.assignment, unseated: placed.unseated, oppositeLeft: 0 };
+    }
+    var best = placed;
+    var bestScore = tune(best);
+    var restarts = seats.length > 80 ? 8 : 20;
+    var r;
+    for (r = 0; r < restarts && bestScore > 0; r += 1) {
+      var candidate = place();
+      var score = tune(candidate);
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    return { ok: true, errors: [], assignment: best.assignment, unseated: best.unseated, oppositeLeft: bestScore };
   }
 
   function visualLine(count, aisle) {
@@ -468,6 +670,40 @@
     return { maxSlots: maxSlots, lines: lines };
   }
 
+  function seatNeighbors(rowCounts, options) {
+    var grid = buildChartGrid(rowCounts, options || {});
+    var idAt = [];
+    var map = {};
+    var r;
+    var c;
+    for (r = 0; r < grid.lines.length; r += 1) {
+      idAt[r] = [];
+      var cells = grid.lines[r].cells;
+      for (c = 0; c < cells.length; c += 1) {
+        var cell = cells[c];
+        if (cell.type !== "seat") {
+          idAt[r][c] = "";
+          continue;
+        }
+        var id = "r" + grid.lines[r].row + "c" + cell.col;
+        idAt[r][c] = id;
+        map[id] = [];
+      }
+    }
+    Object.keys(map).forEach(function (id) {
+      var here = null;
+      for (r = 0; r < idAt.length && !here; r += 1) {
+        for (c = 0; c < idAt[r].length; c += 1) if (idAt[r][c] === id) here = { r: r, c: c };
+      }
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (step) {
+        var row = idAt[here.r + step[0]];
+        var other = row && row[here.c + step[1]];
+        if (other) map[id].push(other);
+      });
+    });
+    return map;
+  }
+
   function excelSafe(value) {
     var text = String(value == null ? "" : value);
     var head = text.charAt(0);
@@ -504,6 +740,9 @@
     decodeTableText: decodeTableText,
     cleanName: cleanName,
     cleanNumber: cleanNumber,
+    cleanGender: cleanGender,
+    countOpposite: countOpposite,
+    seatNeighbors: seatNeighbors,
     columnCount: columnCount,
     excelSafe: excelSafe,
   };

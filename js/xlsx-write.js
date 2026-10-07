@@ -322,8 +322,8 @@
   }
 
   function listModel(list) {
-    var header = ["行（前から）", "列（向かって左から）", "列（先生から左から）", "出席番号", "氏名", "決まり方"];
-    var weights = [14, 18, 20, 12, 22, 20];
+    var header = ["行（前から）", "列（向かって左から）", "列（先生から左から）", "番号", "名前", "性別", "決まり方"];
+    var weights = [14, 16, 18, 10, 20, 8, 16];
     var weightSum = 0;
     var w;
     for (w = 0; w < weights.length; w += 1) weightSum += weights[w];
@@ -333,7 +333,7 @@
       cells: header.map(function (value, index) { return { col: index + 1, value: value, style: 8 }; }),
     }];
     list.forEach(function (item) {
-      var values = [item.rowLabel, item.fromLeft, item.fromTeacher, item.number, item.name, item.how];
+      var values = [item.rowLabel, item.fromLeft, item.fromTeacher, item.number, item.name, item.gender, item.how];
       rows.push({
         hpt: 18,
         cells: values.map(function (value, index) { return { col: index + 1, value: value == null ? "" : String(value), style: 9 }; }),
@@ -344,14 +344,14 @@
       rows: rows,
       merges: [],
       freeze: true,
-      autoFilter: "A1:F" + Math.max(1, rows.length),
+      autoFilter: "A1:G" + Math.max(1, rows.length),
       header: "教員用の一覧",
       footer: "名簿はこの端末の中だけで作っています",
       orientation: "portrait",
       fitWidth: 1,
       fitHeight: 0,
       centerVertical: false,
-      printArea: "$A$1:$F$" + Math.max(1, rows.length),
+      printArea: "$A$1:$G$" + Math.max(1, rows.length),
       printTitle: "$1:$1",
     };
   }

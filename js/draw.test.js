@@ -78,9 +78,58 @@ check("人が席より多い組は拒否", S.validate(students, seats, [], [{ st
 
 const matrix = [["クラス名簿"], ["出席番号", "ふりがな", "氏名"], [1, "あおば", "青葉 湊"], [2, "いぶき", "伊吹 早苗"]];
 const guess = S.guessMapping(matrix);
-check("見出しとふりがなを外す", guess.headerRow === 1 && guess.numberCol === 0 && guess.nameCol === 2);
+check("見出しとふりがなを外す", guess.headerRow === 1 && guess.numberCol === 0 && guess.nameCol === 2 && guess.genderCol === -1);
 const extracted = S.extractPeople(matrix, guess.headerRow, guess.numberCol, guess.nameCol);
 check("名前だけ抜く", extracted.people.map((p) => p.name).join() === "青葉 湊,伊吹 早苗");
+check("性別の列がなければ空", extracted.people.every((p) => p.gender === ""));
+const gendered = [["出席番号", "ふりがな", "氏名", "性別"], [1, "あおば", "青葉 湊", "女性"], [2, "いぶき", "伊吹 早苗", "男"]];
+const gmap = S.guessMapping(gendered);
+check("性別の列を見つける", gmap.numberCol === 0 && gmap.nameCol === 2 && gmap.genderCol === 3);
+const gpeople = S.extractPeople(gendered, gmap.headerRow, gmap.numberCol, gmap.nameCol, gmap.genderCol);
+check("性別を男と女にする", gpeople.people.map((p) => p.gender).join() === "女,男");
+check("わからない性別は空", S.cleanGender("その他") === "" && S.cleanGender("男性") === "男");
+
+const rowNeighbors = S.seatNeighbors([4], { aisle: true });
+check("通路で隣が切れる", rowNeighbors.r0c0.indexOf("r0c1") >= 0 && rowNeighbors.r0c1.indexOf("r0c2") < 0 && rowNeighbors.r0c2.indexOf("r0c3") >= 0);
+const colNeighbors = S.seatNeighbors(S.columnSeats([2, 1]).rows, { columns: [2, 1] });
+check("空いた列のうしろは隣にならない", colNeighbors.r0c0.indexOf("r1c0") >= 0 && colNeighbors.r0c1.indexOf("r1c0") < 0 && (colNeighbors.r0c1 || []).indexOf("r1c1") < 0);
+
+function surrounded(assignment, neighbors, people) {
+  const genders = {};
+  people.forEach((person) => { genders[person.id] = person.gender; });
+  return Object.keys(assignment).filter((seatId) => {
+    const gender = genders[assignment[seatId]];
+    if (gender !== "男" && gender !== "女") return false;
+    const around = (neighbors[seatId] || []).map((id) => genders[assignment[id]]).filter((value) => value === "男" || value === "女");
+    const same = around.filter((value) => value === gender).length;
+    return around.length - same > 0 && same === 0;
+  }).length;
+}
+const quad = ["a", "b", "c", "d"].map((id, i) => ({ id, number: String(i + 1), name: "名" + id, gender: i < 2 ? "男" : "女" }));
+const quadNeighbors = S.seatNeighbors([2, 2]);
+let quadBad = 0;
+for (let n = 0; n < 20; n += 1) {
+  const drawn = S.draw(quad, S.makeSeats([2, 2]), [], [], rng(n + 3), { avoidOpposite: true, neighbors: quadNeighbors });
+  if (!drawn.ok || drawn.oppositeLeft !== 0 || surrounded(drawn.assignment, quadNeighbors, quad) !== 0) quadBad += 1;
+}
+check("周りが異性だけにならない", quadBad === 0);
+const lonely = [
+  { id: "a", number: "1", name: "男", gender: "男" },
+  { id: "b", number: "2", name: "女1", gender: "女" },
+  { id: "c", number: "3", name: "女2", gender: "女" },
+  { id: "d", number: "4", name: "女3", gender: "女" }
+];
+const hard = S.draw(lonely, S.makeSeats([2, 2]), [], [], rng(9), { avoidOpposite: true, neighbors: quadNeighbors });
+check("避けきれなくても席は決まる", hard.ok && hard.oppositeLeft >= 1 && surrounded(hard.assignment, quadNeighbors, lonely) === hard.oppositeLeft);
+const room = [];
+for (let i = 0; i < 24; i += 1) room.push({ id: "p" + i, number: String(i + 1), name: "人" + i, gender: i < 12 ? "男" : "女" });
+const roomNeighbors = S.seatNeighbors([6, 6, 6, 6]);
+let roomBad = 0;
+for (let n = 0; n < 8; n += 1) {
+  const drawn = S.draw(room, S.makeSeats([6, 6, 6, 6]), [{ studentId: "p0", seatId: "r0c0" }], [], rng(200 + n), { avoidOpposite: true, neighbors: roomNeighbors });
+  if (!drawn.ok || drawn.assignment.r0c0 !== "p0" || drawn.oppositeLeft !== 0) roomBad += 1;
+}
+check("24人でも固定を守って避ける", roomBad === 0);
 check("式として始まる文字を避ける", S.excelSafe("=1+1") === "'=1+1" && S.excelSafe("青葉") === "青葉");
 
 execFileSync("python3", ["-c", "open('/tmp/sekigae-sjis.csv','w',encoding='cp932').write('出席番号,氏名\\n1,青葉 湊\\n')"]);
@@ -112,7 +161,7 @@ const teacher = X.teacherFile({
   header: "教員用",
   grid: S.buildChartGrid([2], { mirror: true }),
   resolve,
-  list: [{ rowLabel: "1", fromLeft: "1", fromTeacher: "2", number: "1", name: "=1+1", how: "ランダム" }]
+  list: [{ rowLabel: "1", fromLeft: "1", fromTeacher: "2", number: "1", name: "=1+1", gender: "女", how: "ランダム" }]
 });
 const teacherBook = XLSX.read(teacher, { type: "array" });
 check("教員用は配置と一覧", teacherBook.SheetNames.join() === "配置,一覧");
@@ -145,6 +194,10 @@ const workbookXml = sheetXmlOf(teacher, "xl/workbook.xml");
 check("配置はA4横1枚", teacherSheet.indexOf('orientation="landscape"') >= 0 && teacherSheet.indexOf('fitToHeight="1"') >= 0);
 check("一覧はA4縦", listSheet.indexOf('paperSize="9"') >= 0 && listSheet.indexOf('orientation="portrait"') >= 0 && listSheet.indexOf('fitToWidth="1"') >= 0 && listSheet.indexOf('fitToHeight="0"') >= 0);
 check("一覧の見出しを繰り返す", workbookXml.indexOf("Print_Titles") >= 0 && workbookXml.indexOf("一覧") >= 0);
+const numberAt = listSheet.indexOf(">番号<");
+const nameAt = listSheet.indexOf(">名前<");
+const genderAt = listSheet.indexOf(">性別<");
+check("一覧は番号・名前・性別の順", numberAt >= 0 && numberAt < nameAt && nameAt < genderAt && listSheet.indexOf(">女<") > genderAt && listSheet.indexOf("A1:G") >= 0 && workbookXml.indexOf("$G$") >= 0);
 
 const before = Object.keys(Object.prototype).length;
 XLSX.read(fs.readFileSync("/tmp/sekigae-poster.xlsx"), { type: "array", cellFormula: false, cellHTML: false, bookVBA: false });

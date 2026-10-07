@@ -15,7 +15,7 @@
     <div>
       <p class="eyebrow">教室の席替え</p>
       <h1>席替えくじ</h1>
-      <p class="lede">このページをブラウザで開いて使います。名簿の番号と名前を読み、席をランダムに決めます。結果は掲示用と教員用のページで開けます。</p>
+      <p class="lede">このページをブラウザで開いて使います。名簿の番号、名前、性別を読み、席をランダムに決めます。結果は掲示用と教員用のページで開けます。</p>
     </div>
     <div class="top-actions">
       <button type="button" id="btnSample">サンプル名簿</button>
@@ -28,7 +28,7 @@
   <main class="workspace">
     <section class="panel" aria-labelledby="rosterHeading">
       <h2 id="rosterHeading">名簿</h2>
-      <p class="hint">ExcelかCSVを読みます。番号と名前は、この端末の中だけで扱います。</p>
+      <p class="hint">ExcelかCSVを読みます。番号、名前、性別は、この端末の中だけで扱います。</p>
       <div id="drop" class="drop">
         <p>ここにドロップ</p>
         <label class="file-btn">名簿を選ぶ
@@ -39,6 +39,7 @@
         <label>シート <select id="sheet"></select></label>
         <label>番号の列 <select id="colNumber"></select></label>
         <label>名前の列 <select id="colName"></select></label>
+        <label>性別の列 <select id="colGender"></select></label>
         <label>見出し <select id="headerRow"></select></label>
         <div id="preview"></div>
         <div class="row-actions">
@@ -48,13 +49,18 @@
         </div>
       </div>
       <div class="roster-tools">
-        <input id="rosterFilter" type="search" placeholder="番号・名前で絞る" autocomplete="off">
+        <input id="rosterFilter" type="search" placeholder="番号・名前・性別で絞る" autocomplete="off">
         <button type="button" id="btnSort">番号順</button>
       </div>
       <ul id="roster" class="roster"></ul>
       <form id="addForm" class="add-form" autocomplete="off">
         <input id="addNumber" maxlength="20" placeholder="番号" aria-label="番号">
         <input id="addName" maxlength="80" placeholder="名前" aria-label="名前" required>
+        <select id="addGender" aria-label="性別">
+          <option value="">—</option>
+          <option value="男">男</option>
+          <option value="女">女</option>
+        </select>
         <button type="submit">追加</button>
       </form>
     </section>
@@ -132,9 +138,9 @@
       <details class="help">
         <summary>使い方</summary>
         <ol>
-          <li>名簿を読み、番号と名前の列を確認します。</li>
+          <li>名簿を読み、番号、名前、性別の列を確認します。性別の列はなくても引きます。</li>
           <li>行と列、座席数、行ごと、または列ごとの席数を決めます。短い行は黒板の中央に揃います。</li>
-          <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。</li>
+          <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。「周りが異性だけにならない」にすると、上下左右が異性だけになる席を避けます。通路の向こうは隣になりません。</li>
           <li>席替えすると演出のあと席が決まります。掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>
         </ol>
       </details>
@@ -143,6 +149,7 @@
 
   <div class="drawbar">
     <p id="status" class="status" role="status"></p>
+    <label class="check"><input id="avoidOpposite" type="checkbox"> 周りが異性だけにならない</label>
     <div class="draw-actions">
       <button type="button" id="btnDraw" class="draw">席替えする</button>
       <button type="button" id="btnQuiet">結果だけ出す</button>

@@ -73,6 +73,7 @@ h1 { margin: 0; font-size: 2.4rem; letter-spacing: 0.08em; }
 .layout, .mapping, .draft { display: grid; gap: 8px; margin: 10px 0; }
 label { display: grid; gap: 4px; font-size: 0.86rem; }
 .check { display: flex; align-items: center; gap: 8px; }
+.check input { width: auto; }
 input, select {
   width: 100%;
   border: 1px solid var(--line);
@@ -95,12 +96,12 @@ input, select {
 .roster, .rule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .person, .rule-list li {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
   gap: 6px;
   align-items: center;
 }
 .rule-list li { grid-template-columns: 1fr auto; }
-.person { padding: 4px; border-radius: 10px; }
+.add-form { display: grid; grid-template-columns: 64px minmax(0, 1fr) 4.5rem auto; gap: 6px; margin-top: 8px; }
+.person { grid-template-columns: 64px minmax(0, 1fr) 4.5rem auto; padding: 4px; border-radius: 10px; }
 .person.is-in-draft { background: #fff1cc; }
 .person.is-locked { outline: 1px solid var(--line); }
 .person button, .rule-list button { padding: 0.3rem 0.55rem; }
@@ -115,7 +116,7 @@ input, select {
 }
 .row-edit { display: grid; grid-template-columns: 1fr 90px auto; gap: 6px; align-items: center; }
 .preview-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.preview-table td { border-bottom: 1px solid var(--line); padding: 3px 4px; }
+.preview-table th, .preview-table td { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; }
 
 .room { overflow-x: auto; padding-top: 8px; }
 .room-stack { width: max-content; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -178,6 +179,7 @@ input, select {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
 }
 .status { margin: 0 0 8px; font-size: 0.88rem; }
+.drawbar .check { margin: 0 0 8px; }
 .draw { font-family: "Yu Mincho", serif; font-size: 1.25rem; padding: 0.7rem 1.4rem; }
 .toast {
   position: fixed;
