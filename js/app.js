@@ -232,6 +232,7 @@
     document.getElementById("btnSound").textContent = state.sound ? "音あり" : "音なし";
     document.getElementById("draftBox").hidden = !state.draft;
     document.getElementById("newGroup").hidden = !!state.draft;
+    document.getElementById("rosterPickHint").hidden = !(state.mode === "group" && state.draft);
   }
 
   function renderRoster() {
@@ -247,11 +248,13 @@
       number.maxLength = 20;
       number.setAttribute("aria-label", "番号");
       var picking = state.mode === "group" && state.draft;
+      if (picking) item.classList.add("is-picking");
       var name = document.createElement(picking ? "button" : "input");
       if (picking) {
         name.type = "button";
         name.className = "pick-person";
         name.dataset.pickStudent = student.id;
+        name.dataset.personName = student.name;
         name.textContent = student.name;
       } else {
         name.value = student.name;
@@ -290,7 +293,10 @@
       el.classList.toggle("is-in-draft", chosen);
       el.classList.toggle("is-locked", heldStudent(el.dataset.id));
       var pick = el.querySelector("[data-pick-student]");
-      if (pick) pick.setAttribute("aria-pressed", chosen ? "true" : "false");
+      if (pick) {
+        pick.setAttribute("aria-pressed", chosen ? "true" : "false");
+        pick.textContent = (chosen ? "選択中 " : "") + (pick.dataset.personName || "");
+      }
     });
   }
 
@@ -692,6 +698,23 @@
     else if (people && people === seats) note = "この" + people + "人を、この席の中だけで引きます。";
     box.textContent = people + "人 / " + seats + "席。" + note;
     document.getElementById("draftSave").disabled = !(people > 0 && seats >= people);
+    renderDraftPeople();
+  }
+  function renderDraftPeople() {
+    var box = document.getElementById("draftPeople");
+    if (!box) return;
+    box.textContent = "";
+    if (!(state.mode === "group" && state.draft)) return;
+    state.students.forEach(function (student) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "draft-person";
+      button.dataset.pickStudent = student.id;
+      var chosen = state.draft.studentIds.indexOf(student.id) >= 0;
+      button.setAttribute("aria-pressed", chosen ? "true" : "false");
+      button.textContent = (chosen ? "選択中 " : "") + (student.number ? student.number + " " : "") + student.name;
+      box.appendChild(button);
+    });
   }
 
   function exchange(a, b) {
@@ -1430,13 +1453,19 @@
       updateDraftCount();
       save();
     }
+    document.getElementById("draftPeople").addEventListener("click", function (event) {
+      var pick = event.target.closest("[data-pick-student]");
+      if (pick) toggleDraftStudent(pick.dataset.pickStudent);
+    });
     document.getElementById("roster").addEventListener("click", function (event) {
       var remove = event.target.closest("[data-remove-student]");
       if (remove) { removeStudent(remove.dataset.removeStudent); return; }
       var pick = event.target.closest("[data-pick-student]");
       if (pick) { toggleDraftStudent(pick.dataset.pickStudent); return; }
+      if (!(state.mode === "group" && state.draft)) return;
+      if (event.target.closest("input, select, [data-remove-student]")) return;
       var person = event.target.closest(".person");
-      if (!person || event.target.closest("input, button, select")) return;
+      if (!person) return;
       toggleDraftStudent(person.dataset.id);
     });
     document.getElementById("room").addEventListener("click", function (event) {
@@ -1509,6 +1538,7 @@
       renderRoster();
       renderRoom();
       renderStatus();
+      document.getElementById("draftBox").scrollIntoView({ block: "nearest" });
     });
     document.getElementById("draftCancel").addEventListener("click", function () {
       state.draft = null;

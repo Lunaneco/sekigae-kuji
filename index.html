@@ -51,6 +51,7 @@
         <input id="rosterFilter" type="search" placeholder="番号・名前・性別で絞る" autocomplete="off">
         <button type="button" id="btnSort">番号順</button>
       </div>
+      <p id="rosterPickHint" class="hint" hidden>名前を押すと、その人がこの組に入ります。もう一度押すと外れます。</p>
       <ul id="roster" class="roster"></ul>
       <form id="addForm" class="add-form" autocomplete="off">
         <input id="addNumber" maxlength="20" placeholder="番号" aria-label="番号">
@@ -112,11 +113,12 @@
         <div id="draftBox" class="draft" hidden>
           <label>組の名前 <input id="draftName" maxlength="24" placeholder="例: 最前列" autocomplete="off"></label>
           <p id="draftCount" class="hint"></p>
-          <p class="hint">名前をクリックして人を選び、教室の席をクリックします。</p>
+          <p class="hint">名前を押すと、その人がこの組に入ります。もう一度押すと外れます。席は教室でクリックします。</p>
           <div class="row-actions">
             <button type="button" id="draftSave">この組で抽選する</button>
             <button type="button" id="draftCancel">やめる</button>
           </div>
+          <div id="draftPeople" class="draft-people"></div>
         </div>
         <ul id="groupList" class="rule-list"></ul>
       </section>

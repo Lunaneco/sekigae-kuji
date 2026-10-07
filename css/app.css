@@ -105,20 +105,52 @@ input, select {
 .rule-list li { grid-template-columns: 1fr auto; }
 .add-form { display: grid; grid-template-columns: 64px minmax(0, 1fr) 4.5rem auto; gap: 6px; margin-top: 8px; }
 .person { grid-template-columns: 64px minmax(0, 1fr) 4.5rem auto; padding: 4px; border-radius: 10px; }
-.person.is-in-draft { background: #fff1cc; }
+.person.is-picking { grid-template-columns: 64px minmax(0, 1fr) auto; }
+.person.is-in-draft { background: #243044; }
 .person.is-locked { outline: 1px solid var(--line); }
 .person button, .rule-list button { padding: 0.3rem 0.55rem; }
 .person .pick-person {
+  grid-column: 1 / -1;
+  grid-row: 1;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fffaf2;
   color: var(--ink);
   text-align: left;
-  padding: 0.45rem 0.6rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
 }
-.person.is-in-draft .pick-person { background: #fff1cc; border-color: var(--gold); font-weight: 700; }
-.person.is-locked .pick-person { color: var(--muted); }
+.person.is-picking > :not(.pick-person) { grid-row: 2; }
+.person.is-in-draft .pick-person,
+.panel .draft-person[aria-pressed="true"] {
+  background: #243044;
+  color: #f6f0e4;
+  border-color: #c6a15b;
+  font-weight: 700;
+}
+.person.is-locked:not(.is-in-draft) .pick-person { color: var(--muted); }
+.panel .draft-person {
+  border-radius: 12px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.draft-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf2;
+}
+.draft { scroll-margin-top: 12px; scroll-margin-bottom: 220px; }
 
 .view-switch { display: flex; gap: 0; }
 .view-switch button { border-radius: 0; border: 1px solid var(--line); background: #fffaf2; }
