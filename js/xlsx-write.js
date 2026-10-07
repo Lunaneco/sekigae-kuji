@@ -93,17 +93,22 @@
     return out;
   }
 
-  function stylesXml() {
+  function stylesXml(fonts) {
+    fonts = fonts || {};
+    var board = fonts.board || 26;
+    var seat = fonts.seat || 14;
+    var empty = fonts.empty || 12;
+    var aisle = fonts.aisle || 11;
     return (
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       '<fonts count="7">' +
       '<font><sz val="11"/><name val="游ゴシック"/><charset val="128"/></font>' +
       '<font><b/><sz val="12"/><color rgb="FF241C16"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="28"/><color rgb="FFF3F7EA"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="18"/><color rgb="FF241C16"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><sz val="14"/><color rgb="FF6D6256"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><sz val="11"/><color rgb="FF415064"/><name val="游ゴシック"/><charset val="128"/></font>' +
+      '<font><b/><sz val="' + board + '"/><color rgb="FFF3F7EA"/><name val="游ゴシック"/><charset val="128"/></font>' +
+      '<font><b/><sz val="' + seat + '"/><color rgb="FF241C16"/><name val="游ゴシック"/><charset val="128"/></font>' +
+      '<font><sz val="' + empty + '"/><color rgb="FF6D6256"/><name val="游ゴシック"/><charset val="128"/></font>' +
+      '<font><sz val="' + aisle + '"/><color rgb="FF415064"/><name val="游ゴシック"/><charset val="128"/></font>' +
       '<font><b/><sz val="12"/><color rgb="FFF6F0E4"/><name val="游ゴシック"/><charset val="128"/></font>' +
       "</fonts>" +
       '<fills count="9">' +
@@ -172,15 +177,32 @@
       '<sheetFormatPr defaultRowHeight="18"/>' +
       "<cols>" + cols + "</cols><sheetData>" + data + "</sheetData>" +
       filter + merges +
-      '<printOptions horizontalCentered="1"/>' +
-      '<pageMargins left="0.4" right="0.4" top="0.55" bottom="0.45" header="0.2" footer="0.2"/>' +
-      '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="' + model.fitHeight + '"/>' +
+      '<printOptions horizontalCentered="1"' + (model.centerVertical ? ' verticalCentered="1"' : "") + "/>" +
+      '<pageMargins left="0.4" right="0.4" top="0.45" bottom="0.4" header="0.2" footer="0.2"/>' +
+      '<pageSetup paperSize="9" orientation="' + (model.orientation || "landscape") + '" fitToWidth="' + (model.fitWidth == null ? 1 : model.fitWidth) + '" fitToHeight="' + (model.fitHeight == null ? 1 : model.fitHeight) + '" pageOrder="downThenOver"/>' +
       "<headerFooter><oddHeader>&amp;C" + xml(model.header) + "</oddHeader><oddFooter>&amp;C" + xml(model.footer) + "</oddFooter></headerFooter>" +
       "</worksheet>"
     );
   }
 
+  function definedNamesXml(sheets) {
+    var names = [];
+    sheets.forEach(function (sheet, index) {
+      var model = sheet.model;
+      var quoted = "'" + String(sheet.name).replace(/'/g, "''") + "'!";
+      if (model.printArea) {
+        names.push('<definedName name="_xlnm.Print_Area" localSheetId="' + index + '">' + xml(quoted + model.printArea) + "</definedName>");
+      }
+      if (model.printTitle) {
+        names.push('<definedName name="_xlnm.Print_Titles" localSheetId="' + index + '">' + xml(quoted + model.printTitle) + "</definedName>");
+      }
+    });
+    return names.length ? "<definedNames>" + names.join("") + "</definedNames>" : "";
+  }
+
   function workbookBytes(sheets) {
+    var fonts = null;
+    sheets.forEach(function (sheet) { if (sheet.model.fonts) fonts = sheet.model.fonts; });
     var sheetXmls = sheets.map(function (sheet, index) { return sheetXml(sheet.model, index === 0); });
     var names = sheets.map(function (sheet, index) {
       return '<sheet name="' + xml(sheet.name) + '" sheetId="' + (index + 1) + '" r:id="rId' + (index + 1) + '"/>';
@@ -196,9 +218,9 @@
     var files = [
       { name: "[Content_Types].xml", data: utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + overrides + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>') },
       { name: "_rels/.rels", data: utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>') },
-      { name: "xl/workbook.xml", data: utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + names + "</sheets></workbook>") },
+      { name: "xl/workbook.xml", data: utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + names + "</sheets>" + definedNamesXml(sheets) + "</workbook>") },
       { name: "xl/_rels/workbook.xml.rels", data: utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + "</Relationships>") },
-      { name: "xl/styles.xml", data: utf8(stylesXml()) },
+      { name: "xl/styles.xml", data: utf8(stylesXml(fonts)) },
     ];
     sheetXmls.forEach(function (body, index) {
       files.push({ name: "xl/worksheets/sheet" + (index + 1) + ".xml", data: utf8(body) });
@@ -214,15 +236,52 @@
     return { value: number ? number + "\n" + name : name, style: style };
   }
 
+  function inchesToWch(inches) {
+    var pixels = Math.max(16, inches * 96);
+    return Math.round(((pixels - 5) / 8) * 10) / 10;
+  }
+
+  function chartMetrics(slotCount, lineCount) {
+    var printableW = 297 / 25.4 - 0.8;
+    var printableH = (210 / 25.4 - 0.85) * 72;
+    var labelIn = Math.min(1, Math.max(0.72, printableW * 0.1));
+    var seatIn = (printableW - labelIn) / Math.max(1, slotCount);
+    var slack = 0.96;
+    var captionPt = 18;
+    var backPt = 16;
+    var boardPt = Math.max(28, Math.min(44, Math.round(printableH * 0.11)));
+    var natural = (printableH * slack - captionPt - boardPt - backPt) / Math.max(1, lineCount);
+    var seatPt = Math.max(26, Math.min(72, Math.round(natural)));
+    var cellWpt = seatIn * slack * 72;
+    var byWidth = Math.floor(cellWpt / 5.2);
+    var byHeight = Math.floor((seatPt - 6) / 2.15);
+    var seatFont = Math.max(8, Math.min(16, byWidth, byHeight));
+    return {
+      labelWch: inchesToWch(labelIn * slack),
+      seatWch: inchesToWch(seatIn * slack),
+      captionPt: captionPt,
+      boardPt: boardPt,
+      seatPt: seatPt,
+      backPt: backPt,
+      fonts: {
+        board: Math.max(16, Math.min(28, Math.round((cellWpt * Math.max(1, slotCount)) / 16))),
+        seat: seatFont,
+        empty: Math.max(8, seatFont - 1),
+        aisle: Math.max(8, Math.min(12, seatFont)),
+      },
+    };
+  }
+
   function chartModel(options) {
     var grid = options.grid;
     var maxSlots = grid.maxSlots || 1;
-    var cols = [{ wch: 12 }];
+    var metrics = chartMetrics(maxSlots, grid.lines.length);
+    var cols = [{ wch: metrics.labelWch }];
     var c;
-    for (c = 0; c < maxSlots; c += 1) cols.push({ wch: 16 });
+    for (c = 0; c < maxSlots; c += 1) cols.push({ wch: metrics.seatWch });
     var rows = [
-      { hpt: 24, cells: [{ col: 1, value: options.caption, style: 1 }] },
-      { hpt: 58, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] },
+      { hpt: metrics.captionPt, cells: [{ col: 1, value: options.caption, style: 1 }] },
+      { hpt: metrics.boardPt, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] },
     ];
     grid.lines.forEach(function (line) {
       var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
@@ -236,9 +295,9 @@
         var text = seatText(options.resolve(line.row, cell.col));
         cells.push({ col: col, value: text.value, style: text.style });
       });
-      rows.push({ hpt: 72, cells: cells });
+      rows.push({ hpt: metrics.seatPt, cells: cells });
     });
-    rows.push({ hpt: 22, cells: [{ col: 2, value: "うしろ", style: 1 }] });
+    rows.push({ hpt: metrics.backPt, cells: [{ col: 2, value: "うしろ", style: 1 }] });
     var lastCol = maxSlots + 1;
     var lastRow = rows.length;
     return {
@@ -253,12 +312,22 @@
       autoFilter: null,
       header: options.header,
       footer: "名簿はこの端末の中だけで作っています",
+      orientation: "landscape",
+      fitWidth: 1,
       fitHeight: 1,
+      centerVertical: true,
+      fonts: metrics.fonts,
+      printArea: "$A$1:$" + colLetter(lastCol) + "$" + lastRow,
     };
   }
 
   function listModel(list) {
     var header = ["行（前から）", "列（向かって左から）", "列（先生から左から）", "出席番号", "氏名", "決まり方"];
+    var weights = [14, 18, 20, 12, 22, 20];
+    var weightSum = 0;
+    var w;
+    for (w = 0; w < weights.length; w += 1) weightSum += weights[w];
+    var totalWch = inchesToWch((210 / 25.4 - 0.8) * 0.96);
     var rows = [{
       hpt: 22,
       cells: header.map(function (value, index) { return { col: index + 1, value: value, style: 8 }; }),
@@ -266,19 +335,24 @@
     list.forEach(function (item) {
       var values = [item.rowLabel, item.fromLeft, item.fromTeacher, item.number, item.name, item.how];
       rows.push({
-        hpt: 20,
+        hpt: 18,
         cells: values.map(function (value, index) { return { col: index + 1, value: value == null ? "" : String(value), style: 9 }; }),
       });
     });
     return {
-      cols: [16, 16, 18, 14, 22, 24].map(function (wch) { return { wch: wch }; }),
+      cols: weights.map(function (weight) { return { wch: Math.round(totalWch * weight / weightSum * 10) / 10 }; }),
       rows: rows,
       merges: [],
       freeze: true,
       autoFilter: "A1:F" + Math.max(1, rows.length),
       header: "教員用の一覧",
       footer: "名簿はこの端末の中だけで作っています",
+      orientation: "portrait",
+      fitWidth: 1,
       fitHeight: 0,
+      centerVertical: false,
+      printArea: "$A$1:$F$" + Math.max(1, rows.length),
+      printTitle: "$1:$1",
     };
   }
 

@@ -106,6 +106,34 @@ const teacherBook = XLSX.read(teacher, { type: "array" });
 check("教員用は配置と一覧", teacherBook.SheetNames.join() === "配置,一覧");
 check("教員用は左が生徒の右", teacherBook.Sheets["配置"].B3 && String(teacherBook.Sheets["配置"].B3.v).indexOf("右") >= 0);
 
+function sheetXmlOf(bytes, name) {
+  fs.writeFileSync("/tmp/sekigae-page.xlsx", Buffer.from(bytes));
+  return execFileSync("python3", ["-c", "import zipfile; print(zipfile.ZipFile('/tmp/sekigae-page.xlsx').read('" + name + "').decode())"], { encoding: "utf8" });
+}
+function colWidths(xmlText) {
+  return Array.from(xmlText.matchAll(/<col [^>]*width="([\d.]+)"/g)).map(function (match) { return Number(match[1]); });
+}
+const posterXml = sheetXmlOf(poster, "xl/worksheets/sheet1.xml");
+const posterWidths = colWidths(posterXml);
+const wideXml = sheetXmlOf(X.posterFile({
+  caption: "広",
+  header: "広",
+  grid: S.buildChartGrid([12], {}),
+  resolve
+}), "xl/worksheets/sheet1.xml");
+const wideWidths = colWidths(wideXml);
+const posterSum = posterWidths.reduce(function (sum, n) { return sum + n; }, 0);
+check("掲示用はA4横1枚", posterXml.indexOf('paperSize="9"') >= 0 && posterXml.indexOf('orientation="landscape"') >= 0 && posterXml.indexOf('fitToWidth="1"') >= 0 && posterXml.indexOf('fitToHeight="1"') >= 0 && posterXml.indexOf('fitToPage="1"') >= 0);
+check("席が多いと列が狭くなる", wideWidths.length === 13 && posterWidths.length === 5 && wideWidths[1] < posterWidths[1]);
+check("掲示用の幅がA4に近い", posterSum > 90 && posterSum < 145 && Math.abs(posterSum - colWidths(wideXml).reduce(function (sum, n) { return sum + n; }, 0)) < 8);
+fs.writeFileSync("/tmp/sekigae-page.xlsx", Buffer.from(teacher));
+const teacherSheet = sheetXmlOf(teacher, "xl/worksheets/sheet1.xml");
+const listSheet = sheetXmlOf(teacher, "xl/worksheets/sheet2.xml");
+const workbookXml = sheetXmlOf(teacher, "xl/workbook.xml");
+check("配置はA4横1枚", teacherSheet.indexOf('orientation="landscape"') >= 0 && teacherSheet.indexOf('fitToHeight="1"') >= 0);
+check("一覧はA4縦", listSheet.indexOf('paperSize="9"') >= 0 && listSheet.indexOf('orientation="portrait"') >= 0 && listSheet.indexOf('fitToWidth="1"') >= 0 && listSheet.indexOf('fitToHeight="0"') >= 0);
+check("一覧の見出しを繰り返す", workbookXml.indexOf("Print_Titles") >= 0 && workbookXml.indexOf("一覧") >= 0);
+
 const before = Object.keys(Object.prototype).length;
 XLSX.read(fs.readFileSync("/tmp/sekigae-poster.xlsx"), { type: "array", cellFormula: false, cellHTML: false, bookVBA: false });
 check("読み込みで原型を汚さない", Object.keys(Object.prototype).length === before);
