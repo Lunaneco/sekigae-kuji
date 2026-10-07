@@ -409,6 +409,38 @@
 
     var genders = genderMap(students);
     var neighbors = options.neighbors || null;
+    var numberOrder = options.numberOrder === "right" ? "right" : (options.numberOrder === "left" ? "left" : "");
+    var byId = {};
+    var orderIndex = {};
+    var personIndex;
+    for (personIndex = 0; personIndex < students.length; personIndex += 1) {
+      byId[students[personIndex].id] = students[personIndex];
+      orderIndex[students[personIndex].id] = personIndex;
+    }
+
+    function numberKey(student) {
+      var text = String(student && student.number || "").replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+      text = text.replace(/[０-９]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xfee0); });
+      if (/^\d+$/.test(text)) return { group: 0, n: Number(text), text: text };
+      if (text) return { group: 1, n: 0, text: text };
+      return { group: 2, n: 0, text: "" };
+    }
+
+    function comparePeople(a, b) {
+      var ka = numberKey(byId[a]);
+      var kb = numberKey(byId[b]);
+      if (ka.group !== kb.group) return ka.group - kb.group;
+      if (ka.group === 0 && ka.n !== kb.n) return ka.n - kb.n;
+      if (ka.text !== kb.text) return ka.text < kb.text ? -1 : 1;
+      return orderIndex[a] - orderIndex[b];
+    }
+
+    function compareSeats(a, b) {
+      var pa = seatPos(a);
+      var pb = seatPos(b);
+      if (pa.row !== pb.row) return pa.row - pb.row;
+      return numberOrder === "right" ? pb.col - pa.col : pa.col - pb.col;
+    }
 
     function place() {
       var assignment = {};
@@ -422,8 +454,8 @@
       }
       for (i = 0; i < groups.length; i += 1) {
         var group = groups[i];
-        var people = shuffle(group.studentIds, random);
-        var seatPool = shuffle(group.seatIds, random);
+        var people = numberOrder ? group.studentIds.slice().sort(comparePeople) : shuffle(group.studentIds, random);
+        var seatPool = numberOrder ? group.seatIds.slice().sort(compareSeats) : shuffle(group.seatIds, random);
         var n = people.length;
         var k;
         for (k = 0; k < n; k += 1) {
@@ -436,12 +468,12 @@
       for (i = 0; i < students.length; i += 1) {
         if (!usedStudents[students[i].id]) restPeople.push(students[i].id);
       }
-      restPeople = shuffle(restPeople, random);
+      restPeople = numberOrder ? restPeople.sort(comparePeople) : shuffle(restPeople, random);
       var restSeats = [];
       for (i = 0; i < seats.length; i += 1) {
         if (!reservedSeats[seats[i].id]) restSeats.push(seats[i].id);
       }
-      restSeats = shuffle(restSeats, random);
+      restSeats = numberOrder ? restSeats.sort(compareSeats) : shuffle(restSeats, random);
       var pairCount = Math.min(restPeople.length, restSeats.length);
       for (i = 0; i < pairCount; i += 1) assignment[restSeats[i]] = restPeople[i];
       return { assignment: assignment, unseated: restPeople.slice(pairCount), pools: poolMap(restSeats, groups) };
@@ -576,7 +608,7 @@
     }
 
     var placed = place();
-    if (!options.avoidOpposite || !neighbors) {
+    if (numberOrder || !options.avoidOpposite || !neighbors) {
       return { ok: true, errors: [], assignment: placed.assignment, unseated: placed.unseated, oppositeLeft: 0 };
     }
     var best = placed;

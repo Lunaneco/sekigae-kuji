@@ -130,6 +130,52 @@ for (let n = 0; n < 8; n += 1) {
   if (!drawn.ok || drawn.assignment.r0c0 !== "p0" || drawn.oppositeLeft !== 0) roomBad += 1;
 }
 check("24人でも固定を守って避ける", roomBad === 0);
+const numbered = [
+  { id: "a", number: "2", name: "a" },
+  { id: "b", number: "１０", name: "b" },
+  { id: "c", number: "1", name: "c" },
+  { id: "d", number: "3", name: "d" }
+];
+const fromLeft = S.draw(numbered, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "left" });
+check("左はじから番号順", fromLeft.assignment.r0c0 === "c" && fromLeft.assignment.r0c1 === "a" && fromLeft.assignment.r1c0 === "d" && fromLeft.assignment.r1c1 === "b");
+const fromRight = S.draw(numbered, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "right" });
+check("右はじから番号順", fromRight.assignment.r0c1 === "c" && fromRight.assignment.r0c0 === "a" && fromRight.assignment.r1c1 === "d" && fromRight.assignment.r1c0 === "b");
+const numberedPin = S.draw(numbered, S.makeSeats([2, 2]), [{ studentId: "a", seatId: "r0c0" }], [], rng(1), { numberOrder: "left" });
+check("番号順でも固定を守る", numberedPin.assignment.r0c0 === "a" && numberedPin.assignment.r0c1 === "c" && numberedPin.assignment.r1c0 === "d" && numberedPin.assignment.r1c1 === "b");
+const few = [
+  { id: "c", number: "1", name: "c" },
+  { id: "a", number: "2", name: "a" },
+  { id: "d", number: "3", name: "d" }
+];
+const frontFirst = S.draw(few, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "left" });
+check("空席はうしろに残る", frontFirst.assignment.r0c0 === "c" && frontFirst.assignment.r0c1 === "a" && frontFirst.assignment.r1c0 === "d" && !frontFirst.assignment.r1c1);
+const colBuilt = S.columnSeats([2, 1]);
+const fromColRight = S.draw(
+  [{ id: "a", number: "1", name: "a" }, { id: "b", number: "2", name: "b" }, { id: "c", number: "3", name: "c" }],
+  S.makeSeats(colBuilt.rows, colBuilt.columns), [], [], rng(1), { numberOrder: "right" }
+);
+check("右はじは列の右から", fromColRight.assignment.r0c1 === "a" && fromColRight.assignment.r0c0 === "b" && fromColRight.assignment.r1c0 === "c");
+const grouped = S.draw(
+  [{ id: "a", number: "5", name: "a" }, { id: "b", number: "1", name: "b" }, { id: "c", number: "3", name: "c" }, { id: "d", number: "2", name: "d" }],
+  S.makeSeats([2, 2]), [], [{ studentIds: ["a", "b"], seatIds: ["r1c0", "r1c1"] }], rng(4), { numberOrder: "left" }
+);
+check("限定抽選の中も番号順", grouped.assignment.r1c0 === "b" && grouped.assignment.r1c1 === "a" && grouped.assignment.r0c0 === "d" && grouped.assignment.r0c1 === "c");
+const blankFirst = S.draw(
+  [{ id: "a", number: "", name: "後" }, { id: "b", number: "1", name: "先" }],
+  S.makeSeats([2]), [], [], rng(1), { numberOrder: "left" }
+);
+check("番号のない人はうしろ", blankFirst.assignment.r0c0 === "b" && blankFirst.assignment.r0c1 === "a");
+const priority = S.draw(
+  [
+    { id: "a", number: "1", name: "a", gender: "男" },
+    { id: "b", number: "2", name: "b", gender: "女" },
+    { id: "c", number: "3", name: "c", gender: "男" },
+    { id: "d", number: "4", name: "d", gender: "女" }
+  ],
+  S.makeSeats([2, 2]), [], [], rng(3),
+  { numberOrder: "left", avoidOpposite: true, neighbors: S.seatNeighbors([2, 2]) }
+);
+check("番号順は性別指定より優先", priority.assignment.r0c0 === "a" && priority.assignment.r0c1 === "b" && priority.assignment.r1c0 === "c" && priority.assignment.r1c1 === "d");
 check("式として始まる文字を避ける", S.excelSafe("=1+1") === "'=1+1" && S.excelSafe("青葉") === "青葉");
 
 execFileSync("python3", ["-c", "open('/tmp/sekigae-sjis.csv','w',encoding='cp932').write('出席番号,氏名\\n1,青葉 湊\\n')"]);

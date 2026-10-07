@@ -24,7 +24,8 @@
     return {
       v: 1, students: [], rows: [6, 6, 6, 6], columns: null, pins: [], groups: [],
       assignment: null, unseated: [], history: null, aisle: false, teacherView: false,
-      avoidOpposite: false, sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
+      avoidOpposite: false, assignMode: "random", numberFrom: "left", filledBy: "",
+      sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
     };
   }
 
@@ -74,6 +75,8 @@
       return "手直し";
     }
     if (heldSeat(seatId)) return "手直し";
+    if (state.filledBy === "left") return "出席番号順（左はじ）";
+    if (state.filledBy === "right") return "出席番号順（右はじ）";
     return "ランダム";
   }
   function kindOf(how) {
@@ -146,6 +149,9 @@
     next.aisle = !!data.aisle;
     next.teacherView = !!data.teacherView;
     next.avoidOpposite = !!data.avoidOpposite;
+    next.assignMode = data.assignMode === "number" ? "number" : "random";
+    next.numberFrom = data.numberFrom === "right" ? "right" : "left";
+    next.filledBy = data.filledBy === "left" || data.filledBy === "right" ? data.filledBy : "";
     next.sound = data.sound !== false;
     next.nextId = Math.max(maxId, data.nextId | 0);
     state = next;
@@ -196,6 +202,11 @@
     teacher.setAttribute("aria-pressed", state.teacherView ? "true" : "false");
     document.getElementById("aisle").checked = state.aisle;
     document.getElementById("avoidOpposite").checked = state.avoidOpposite;
+    document.getElementById("assignMode").value = state.assignMode === "number" ? "number" : "random";
+    document.getElementById("numberFrom").value = state.numberFrom === "right" ? "right" : "left";
+    var numberOrder = state.assignMode === "number";
+    document.getElementById("numberFromLabel").hidden = !numberOrder;
+    document.getElementById("numberHint").hidden = !numberOrder;
     document.getElementById("pinMode").setAttribute("aria-pressed", state.mode === "pin" ? "true" : "false");
     document.getElementById("swapMode").setAttribute("aria-pressed", state.mode === "swap" ? "true" : "false");
     document.getElementById("btnSound").setAttribute("aria-pressed", state.sound ? "true" : "false");
@@ -631,6 +642,7 @@
       state.groups = [];
       state.assignment = null;
       state.unseated = [];
+      state.filledBy = "";
       state.draft = null;
       state.mode = "view";
     }
@@ -648,7 +660,11 @@
   }
 
   function snapshot() {
-    return { assignment: state.assignment ? Object.assign({}, state.assignment) : null, unseated: state.unseated.slice() };
+    return {
+      assignment: state.assignment ? Object.assign({}, state.assignment) : null,
+      unseated: state.unseated.slice(),
+      filledBy: state.filledBy
+    };
   }
   function remember() { state.history = snapshot(); }
   function undo() {
@@ -656,6 +672,7 @@
     var current = snapshot();
     state.assignment = state.history.assignment ? Object.assign({}, state.history.assignment) : null;
     state.unseated = state.history.unseated.slice();
+    state.filledBy = state.history.filledBy === "left" || state.history.filledBy === "right" ? state.history.filledBy : "";
     state.history = current;
     renderRoom();
     renderStatus();
@@ -804,7 +821,9 @@
     if (report.errors.length) { flash(report.errors[0]); return; }
     if (state.assignment && !window.confirm("いまの結果を消して、もう一度引きます。")) return;
     var drawOptions = {};
-    if (state.avoidOpposite) {
+    if (state.assignMode === "number") {
+      drawOptions.numberOrder = state.numberFrom === "right" ? "right" : "left";
+    } else if (state.avoidOpposite) {
       drawOptions.avoidOpposite = true;
       drawOptions.neighbors = Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns });
     }
@@ -813,6 +832,7 @@
     remember();
     state.assignment = result.assignment;
     state.unseated = result.unseated;
+    state.filledBy = state.assignMode === "number" ? drawOptions.numberOrder : "";
     state.swapFrom = null;
     save();
     renderRoom();
@@ -835,7 +855,12 @@
   }
 
   function resultMessage() {
-    if (!state.avoidOpposite || !state.assignment) return "席が決まりました。";
+    var head = state.filledBy === "left"
+      ? "出席番号順に、左はじから席が決まりました。"
+      : state.filledBy === "right"
+        ? "出席番号順に、右はじから席が決まりました。"
+        : "席が決まりました。";
+    if (state.filledBy || !state.avoidOpposite || !state.assignment) return head;
     var left = Sekigae.countOpposite(state.students, state.assignment, Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns }));
     if (left > 0) return "席が決まりました。周りが異性だけの席が" + left + "人分残っています。";
     return "席が決まりました。";
@@ -1324,9 +1349,19 @@
     document.getElementById("btnClearResult").addEventListener("click", function () {
       state.assignment = null;
       state.unseated = [];
+      state.filledBy = "";
       state.swapFrom = null;
       renderRoom();
       renderStatus();
+      save();
+    });
+    document.getElementById("assignMode").addEventListener("change", function (event) {
+      state.assignMode = event.target.value === "number" ? "number" : "random";
+      renderStatus();
+      save();
+    });
+    document.getElementById("numberFrom").addEventListener("change", function (event) {
+      state.numberFrom = event.target.value === "right" ? "right" : "left";
       save();
     });
     document.getElementById("avoidOpposite").addEventListener("change", function (event) {

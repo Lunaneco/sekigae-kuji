@@ -185,7 +185,9 @@ input, select {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
 }
 .status { margin: 0 0 8px; font-size: 0.88rem; }
-.drawbar .check { margin: 0 0 8px; }
+.assign-row { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 8px; }
+.assign-row label { min-width: 10rem; }
+.drawbar .hint, .drawbar .check { margin: 0 0 8px; }
 .draw { font-family: "Yu Mincho", serif; font-size: 1.25rem; padding: 0.7rem 1.4rem; }
 .toast {
   position: fixed;

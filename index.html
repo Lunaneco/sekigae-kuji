@@ -141,7 +141,8 @@
           <li>名簿を読み、番号、名前、性別の列を確認します。性別の列はなくても引きます。</li>
           <li>行と列、座席数、行ごと、または列ごとの席数を決めます。短い行は黒板の中央に揃います。</li>
           <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。「周りが異性だけにならない」にすると、上下左右が異性だけになる席を避けます。通路の向こうは隣になりません。</li>
-          <li>席替えすると演出のあと席が決まります。掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>
+          <li>席替えすると演出のあと席が決まります。決め方で出席番号順を選ぶと、前の行から左はじ、または右はじへ番号順に座ります。左はじは黒板に向かって左です。</li>
+          <li>掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>
         </ol>
       </details>
     </section>
@@ -149,6 +150,21 @@
 
   <div class="drawbar">
     <p id="status" class="status" role="status"></p>
+    <div class="assign-row">
+      <label>決め方
+        <select id="assignMode">
+          <option value="random">ランダム</option>
+          <option value="number">出席番号順</option>
+        </select>
+      </label>
+      <label id="numberFromLabel">端
+        <select id="numberFrom">
+          <option value="left">左はじから</option>
+          <option value="right">右はじから</option>
+        </select>
+      </label>
+    </div>
+    <p id="numberHint" class="hint" hidden>前の行から埋めます。左はじ・右はじは、黒板に向かっての端です。固定席と限定抽選は守ります。</p>
     <label class="check"><input id="avoidOpposite" type="checkbox"> 周りが異性だけにならない</label>
     <div class="draw-actions">
       <button type="button" id="btnDraw" class="draw">席替えする</button>
