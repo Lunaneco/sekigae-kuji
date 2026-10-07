@@ -67,6 +67,7 @@
             <option value="grid">行と列で指定</option>
             <option value="total">座席数から作る</option>
             <option value="rows">行ごとに席数を指定</option>
+            <option value="cols">列ごとに席数を指定</option>
           </select>
         </label>
         <div id="gridBox" class="layout-fields">
@@ -76,6 +77,11 @@
         <div id="totalBox" class="layout-fields" hidden>
           <label>座席数 <input id="totalSeats" type="number" min="1" max="400" value="24"></label>
           <label>行の数 <input id="rowCount" type="number" min="1" max="20" value="4"></label>
+        </div>
+        <div id="colBox" hidden>
+          <p class="hint">左からの列ごとに、前から何席あるかを入れます。</p>
+          <div id="customCols"></div>
+          <button type="button" id="addCol">列を足す</button>
         </div>
         <div id="customBox" hidden>
           <div id="customRows"></div>
@@ -127,7 +133,7 @@
         <summary>使い方</summary>
         <ol>
           <li>名簿を読み、番号と名前の列を確認します。</li>
-          <li>行と列、座席数、または行ごとの席数を決めます。短い行は黒板の中央に揃います。</li>
+          <li>行と列、座席数、行ごと、または列ごとの席数を決めます。短い行は黒板の中央に揃います。</li>
           <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。</li>
           <li>席替えすると演出のあと席が決まります。掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>
         </ol>

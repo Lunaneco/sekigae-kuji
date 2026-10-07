@@ -22,7 +22,7 @@
 
   function defaultState() {
     return {
-      v: 1, students: [], rows: [6, 6, 6, 6], pins: [], groups: [],
+      v: 1, students: [], rows: [6, 6, 6, 6], columns: null, pins: [], groups: [],
       assignment: null, unseated: [], history: null, aisle: false, teacherView: false,
       sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
     };
@@ -39,7 +39,7 @@
     for (var i = 0; i < state.students.length; i += 1) if (state.students[i].id === id) return state.students[i];
     return null;
   }
-  function seatsNow() { return Sekigae.makeSeats(state.rows); }
+  function seatsNow() { return Sekigae.makeSeats(state.rows, state.columns); }
   function seatCountInRow(row) {
     var n = 0;
     seatsNow().forEach(function (seat) { if (seat.row === row) n += 1; });
@@ -104,10 +104,17 @@
       });
     }
     if (Array.isArray(data.rows) && data.rows.length <= 20 && data.rows.every(function (n) { return typeof n === "number" && n >= 0 && n <= 20; })) next.rows = data.rows.slice();
+    if (Array.isArray(data.columns) && data.columns.length) {
+      var built = Sekigae.columnSeats(data.columns);
+      if (built.ok) {
+        next.columns = built.columns;
+        next.rows = built.rows;
+      }
+    }
     var knownS = {};
     next.students.forEach(function (s) { knownS[s.id] = 1; });
     var knownSeat = {};
-    Sekigae.makeSeats(next.rows).forEach(function (seat) { knownSeat[seat.id] = 1; });
+    Sekigae.makeSeats(next.rows, next.columns).forEach(function (seat) { knownSeat[seat.id] = 1; });
     if (Array.isArray(data.pins)) {
       data.pins.forEach(function (pin) {
         if (knownS[pin.studentId] && knownSeat[pin.seatId]) next.pins.push({ studentId: pin.studentId, seatId: pin.seatId });
@@ -147,8 +154,9 @@
     toastTimer = setTimeout(function () { el.hidden = true; }, 4200);
   }
 
-  function describe(rows) {
+  function describe(rows, columns) {
     var total = rows.reduce(function (sum, n) { return sum + n; }, 0);
+    if (columns && columns.length) return "列ごとの席数 " + columns.join("・") + "（合計" + total + "席）";
     var even = rows.length > 0 && rows.every(function (n) { return n === rows[0]; });
     if (even) return rows.length + "行 × " + rows[0] + "列（合計" + total + "席）";
     return "合計" + total + "席 / " + rows.length + "行";
@@ -165,7 +173,7 @@
 
   function renderStatus() {
     var report = problems();
-    var bits = ["名簿 " + state.students.length + "人", describe(state.rows)];
+    var bits = ["名簿 " + state.students.length + "人", describe(state.rows, state.columns)];
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
     document.getElementById("status").textContent = bits.concat(report.errors, report.warnings).join(" / ");
@@ -243,7 +251,7 @@
   }
 
   function renderRoom() {
-    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: state.teacherView });
+    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: state.teacherView, columns: state.columns });
     var room = document.getElementById("room");
     room.textContent = "";
     var stack = document.createElement("div");
@@ -322,7 +330,7 @@
     }
     if (state.draft && state.draft.seatIds.indexOf(seatId) >= 0) button.classList.add("is-draft");
     if (state.swapFrom && state.swapFrom.type === "seat" && state.swapFrom.id === seatId) button.classList.add("is-picked");
-    var count = state.rows[row] || 0;
+    var count = state.columns && state.columns.length ? state.columns.length : (state.rows[row] || 0);
     var shown = state.teacherView ? count - col : col + 1;
     var coord = document.createElement("span");
     coord.className = "seat-coord";
@@ -427,6 +435,55 @@
       return clampInt(input.value, 0, 20);
     });
   }
+  function columnsFromRows(rows) {
+    var width = 0;
+    rows.forEach(function (n) { if (n > width) width = n; });
+    if (!width) return [4];
+    if (rows.every(function (n) { return n === rows[0]; })) {
+      var even = [];
+      var i;
+      for (i = 0; i < rows[0]; i += 1) even.push(rows.length);
+      return even;
+    }
+    var depths = [];
+    var c;
+    for (c = 0; c < width; c += 1) depths.push(0);
+    rows.forEach(function (count, row) {
+      var pad = Math.floor((width - count) / 2);
+      var i;
+      for (i = 0; i < count; i += 1) depths[pad + i] = row + 1;
+    });
+    return depths.filter(function (n) { return n > 0; });
+  }
+  function renderCustomCols(depths) {
+    var box = document.getElementById("customCols");
+    box.textContent = "";
+    depths.forEach(function (count, index) {
+      var line = document.createElement("div");
+      line.className = "row-edit";
+      var label = document.createElement("span");
+      label.textContent = index + 1 + "列目（左から）";
+      var input = document.createElement("input");
+      input.className = "col-count";
+      input.type = "number";
+      input.min = "1";
+      input.max = "20";
+      input.value = String(count);
+      input.setAttribute("aria-label", index + 1 + "列目の席数");
+      var button = document.createElement("button");
+      button.type = "button";
+      button.dataset.removeCol = String(index);
+      button.textContent = "外す";
+      input.addEventListener("input", updateLayoutPreview);
+      line.append(label, input, button);
+      box.appendChild(line);
+    });
+  }
+  function readCols() {
+    return [].map.call(document.querySelectorAll("#customCols .col-count"), function (input) {
+      return clampInt(input.value, 1, 20);
+    });
+  }
   function proposedRows() {
     var mode = document.getElementById("layoutMode").value;
     if (mode === "grid") {
@@ -441,14 +498,19 @@
         clampInt(document.getElementById("rowCount").value, 1, 20)
       );
     }
+    if (mode === "cols") {
+      var depths = readCols();
+      var built = Sekigae.columnSeats(depths);
+      return built.ok ? built : { ok: false, error: built.error, rows: [], columns: [] };
+    }
     var rows = readCustom();
     if (!rows.length || rows.every(function (n) { return n === 0; })) return { ok: false, error: "座席がありません。", rows: [] };
-    return { ok: true, error: "", rows: rows };
+    return { ok: true, error: "", rows: rows, columns: null };
   }
   function updateLayoutPreview() {
     var next = proposedRows();
     document.getElementById("layoutPreview").textContent = next.ok
-      ? "いま " + describe(state.rows) + "。指定すると " + describe(next.rows) + "。黒板は前の中央に揃います。"
+      ? "いま " + describe(state.rows, state.columns) + "。指定すると " + describe(next.rows, next.columns) + "。黒板は前の中央に揃います。"
       : next.error;
   }
   function syncLayoutPanels() {
@@ -456,6 +518,7 @@
     document.getElementById("gridBox").hidden = mode !== "grid";
     document.getElementById("totalBox").hidden = mode !== "total";
     document.getElementById("customBox").hidden = mode !== "rows";
+    document.getElementById("colBox").hidden = mode !== "cols";
   }
 
   function onPersonEdit(id, field, value) {
@@ -513,8 +576,10 @@
     });
     if (lost && !window.confirm("座席を変えると、はみ出す固定席と限定抽選を外します。")) return;
     state.rows = next.rows;
+    state.columns = next.columns || null;
     pruneToSeats();
     renderCustomRows(state.rows.slice());
+    renderCustomCols(state.columns || columnsFromRows(state.rows));
     refresh();
   }
 
@@ -644,20 +709,18 @@
   }
   function teacherList() {
     var list = [];
-    state.rows.forEach(function (count, row) {
-      for (var col = 0; col < count; col += 1) {
-        var seatId = "r" + row + "c" + col;
-        var studentId = state.assignment[seatId];
-        var student = studentId ? studentById(studentId) : null;
-        list.push({
-          rowLabel: String(row + 1),
-          fromLeft: String(col + 1),
-          fromTeacher: String(count - col),
-          number: student ? student.number : "",
-          name: student ? student.name : "",
-          how: howOf(seatId, studentId)
-        });
-      }
+    seatsNow().forEach(function (seat) {
+      var span = state.columns && state.columns.length ? state.columns.length : (state.rows[seat.row] || 0);
+      var studentId = state.assignment ? state.assignment[seat.id] : "";
+      var student = studentId ? studentById(studentId) : null;
+      list.push({
+        rowLabel: String(seat.row + 1),
+        fromLeft: String(seat.col + 1),
+        fromTeacher: String(span - seat.col),
+        number: student ? student.number : "",
+        name: student ? student.name : "",
+        how: howOf(seat.id, studentId)
+      });
     });
     state.unseated.forEach(function (id) {
       var student = studentById(id);
@@ -670,7 +733,7 @@
     return {
       caption: caption,
       header: header,
-      grid: Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: mirror }),
+      grid: Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: mirror, columns: state.columns }),
       resolve: resolveSeat,
       list: teacherList()
     };
@@ -1077,6 +1140,9 @@
     document.getElementById("layoutMode").addEventListener("change", function () {
       syncLayoutPanels();
       if (document.getElementById("layoutMode").value === "rows") renderCustomRows(state.rows.slice());
+      if (document.getElementById("layoutMode").value === "cols" && !readCols().length) {
+        renderCustomCols(state.columns || columnsFromRows(state.rows));
+      }
       updateLayoutPreview();
     });
     ["gridRows", "gridCols", "totalSeats", "rowCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
@@ -1086,6 +1152,23 @@
       if (rows.length >= 20) return;
       rows.push(6);
       renderCustomRows(rows);
+      updateLayoutPreview();
+    });
+    document.getElementById("addCol").addEventListener("click", function () {
+      var depths = readCols();
+      if (!depths.length) depths = columnsFromRows(state.rows);
+      if (depths.length >= 20) return;
+      depths.push(depths[depths.length - 1] || 4);
+      renderCustomCols(depths);
+      updateLayoutPreview();
+    });
+    document.getElementById("customCols").addEventListener("click", function (event) {
+      var button = event.target.closest("[data-remove-col]");
+      if (!button) return;
+      var depths = readCols();
+      depths.splice(Number(button.dataset.removeCol), 1);
+      if (!depths.length) depths = [4];
+      renderCustomCols(depths);
       updateLayoutPreview();
     });
     document.getElementById("customRows").addEventListener("click", function (event) {
@@ -1219,8 +1302,9 @@
   document.getElementById("totalSeats").value = String(state.rows.reduce(function (sum, n) { return sum + n; }, 0));
   document.getElementById("rowCount").value = String(state.rows.length);
   var even = state.rows.length > 0 && state.rows.every(function (n) { return n === state.rows[0]; });
-  document.getElementById("layoutMode").value = even ? "grid" : "rows";
+  document.getElementById("layoutMode").value = state.columns && state.columns.length ? "cols" : (even ? "grid" : "rows");
   syncLayoutPanels();
   renderCustomRows(state.rows.slice());
+  renderCustomCols(state.columns || columnsFromRows(state.rows));
   refresh();
 })();

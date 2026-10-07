@@ -21,8 +21,17 @@
       known[id] = { id: id, number: String(item.number || "").slice(0, 20), name: String(item.name).slice(0, 80) };
       students.push(known[id]);
     });
+    var columns = null;
+    var rows = data.rows.slice();
+    if (Array.isArray(data.columns) && data.columns.length) {
+      var built = Sekigae.columnSeats(data.columns);
+      if (built.ok) {
+        columns = built.columns;
+        rows = built.rows;
+      }
+    }
     var seats = {};
-    Sekigae.makeSeats(data.rows).forEach(function (seat) { seats[seat.id] = 1; });
+    Sekigae.makeSeats(rows, columns).forEach(function (seat) { seats[seat.id] = 1; });
     var assignment = null;
     if (data.assignment && typeof data.assignment === "object") {
       assignment = {};
@@ -31,7 +40,7 @@
       });
     }
     var unseated = Array.isArray(data.unseated) ? data.unseated.filter(function (id) { return known[id]; }) : [];
-    return { students: known, rows: data.rows.slice(), aisle: !!data.aisle, assignment: assignment, unseated: unseated };
+    return { students: known, rows: rows, columns: columns, aisle: !!data.aisle, assignment: assignment, unseated: unseated };
   }
 
   function cell(tag, className, text) {
@@ -48,7 +57,7 @@
   }
 
   function render(state) {
-    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: teacher });
+    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: teacher, columns: state.columns });
     document.title = teacher ? "教員用の座席表" : "掲示用の座席表";
     document.getElementById("caption").textContent = teacher
       ? "教員用。教卓から見て左が左。黒板は前の中央。"
@@ -78,7 +87,7 @@
           lineEl.appendChild(cell("span", "aisle", "通路"));
           return;
         }
-        var count = state.rows[line.row] || 0;
+        var count = state.columns && state.columns.length ? state.columns.length : (state.rows[line.row] || 0);
         var shown = teacher ? count - item.col : item.col + 1;
         var seatId = "r" + line.row + "c" + item.col;
         var student = state.assignment ? state.students[state.assignment[seatId]] : null;

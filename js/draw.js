@@ -139,10 +139,47 @@
     return { ok: true, error: "", rows: rows };
   }
 
-function makeSeats(rowCounts) {
+  function columnSeats(depths) {
+    if (!Array.isArray(depths) || !depths.length) return { ok: false, error: "列がありません。", rows: [], columns: [] };
+    if (depths.length > 20) return { ok: false, error: "列は20列までです。", rows: [], columns: [] };
+    var columns = [];
+    var total = 0;
+    var i;
+    for (i = 0; i < depths.length; i += 1) {
+      var n = depths[i] | 0;
+      if (n < 1) return { ok: false, error: "各列の席数は1以上にしてください。", rows: [], columns: [] };
+      if (n > 20) return { ok: false, error: "1列は20席までです。", rows: [], columns: [] };
+      columns.push(n);
+      total += n;
+    }
+    if (total > 400) return { ok: false, error: "座席数は400席までです。", rows: [], columns: [] };
+    var max = 0;
+    for (i = 0; i < columns.length; i += 1) if (columns[i] > max) max = columns[i];
+    var rows = [];
+    var r;
+    var c;
+    for (r = 0; r < max; r += 1) {
+      var count = 0;
+      for (c = 0; c < columns.length; c += 1) if (columns[c] > r) count += 1;
+      rows.push(count);
+    }
+    return { ok: true, error: "", rows: rows, columns: columns };
+  }
+
+  function makeSeats(rowCounts, columns) {
     var seats = [];
     var r;
     var c;
+    if (columns && columns.length) {
+      var max = 0;
+      for (c = 0; c < columns.length; c += 1) if ((columns[c] | 0) > max) max = columns[c] | 0;
+      for (r = 0; r < max; r += 1) {
+        for (c = 0; c < columns.length; c += 1) {
+          if ((columns[c] | 0) > r) seats.push({ id: "r" + r + "c" + c, row: r, col: c });
+        }
+      }
+      return seats;
+    }
     for (r = 0; r < rowCounts.length; r += 1) {
       var count = rowCounts[r] | 0;
       if (count < 0) count = 0;
@@ -372,9 +409,43 @@ function makeSeats(rowCounts) {
     return slots;
   }
 
+  function columnSlots(depths, aisle, mirror) {
+    var order = [];
+    var c;
+    for (c = 0; c < depths.length; c += 1) order.push(c);
+    if (mirror) order.reverse();
+    var slots = [];
+    var mid = Math.ceil(order.length / 2);
+    for (c = 0; c < order.length; c += 1) {
+      if (aisle && order.length > 1 && c === mid) slots.push({ type: "aisle" });
+      slots.push({ type: "seat", col: order[c], depth: depths[order[c]] | 0 });
+    }
+    return slots;
+  }
+
   function buildChartGrid(rowCounts, options) {
     var aisle = !!(options && options.aisle);
     var mirror = !!(options && options.mirror);
+    var columns = options && options.columns;
+    if (columns && columns.length) {
+      var slots = columnSlots(columns, aisle, mirror);
+      var depthMax = 0;
+      var n;
+      for (n = 0; n < columns.length; n += 1) if ((columns[n] | 0) > depthMax) depthMax = columns[n] | 0;
+      var columnLines = [];
+      for (n = 0; n < depthMax; n += 1) {
+        var cells = [];
+        var s;
+        for (s = 0; s < slots.length; s += 1) {
+          var slot = slots[s];
+          if (slot.type === "aisle") cells.push({ type: "aisle" });
+          else if (n < slot.depth) cells.push({ type: "seat", col: slot.col });
+          else cells.push({ type: "pad" });
+        }
+        columnLines.push({ row: n, cells: cells });
+      }
+      return { maxSlots: slots.length, lines: columnLines };
+    }
     var lines = [];
     var maxSlots = 0;
     var r;
@@ -423,6 +494,7 @@ function makeSeats(rowCounts) {
     extractPeople: extractPeople,
     distributeSeats: distributeSeats,
     gridSeats: gridSeats,
+    columnSeats: columnSeats,
     makeSeats: makeSeats,
     buildChartGrid: buildChartGrid,
     shuffle: shuffle,
