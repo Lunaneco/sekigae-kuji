@@ -10,7 +10,9 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; min-height: 100%; }
+html { scroll-padding-bottom: 240px; }
 body {
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   color: var(--ink);
@@ -59,13 +61,14 @@ h1 { margin: 0; font-size: 2.4rem; letter-spacing: 0.08em; }
   grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(250px, 320px);
   gap: 16px;
   align-items: start;
-  padding-bottom: 120px;
+  padding-bottom: 260px;
 }
 .panel {
   background: var(--paper);
   border-radius: 18px;
   padding: 16px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  min-width: 0;
 }
 .panel h2 { margin: 0 0 8px; font-size: 1.35rem; }
 .panel h3 { margin: 16px 0 6px; }
@@ -118,7 +121,7 @@ input, select {
 .preview-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .preview-table th, .preview-table td { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; }
 
-.room { overflow-x: auto; padding-top: 8px; }
+.room { min-width: 0; overflow-x: auto; padding-top: 8px; scroll-margin-top: 80px; scroll-margin-bottom: 240px; }
 .room-stack { width: max-content; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .front-label, .back-label, .view-note { margin: 0; color: var(--muted); font-size: 0.8rem; }
 .board {
@@ -171,14 +174,17 @@ input, select {
 .seat.is-secret .seat-num, .seat.is-secret .seat-name, .seat.is-secret .seat-tag { opacity: 0; }
 .seat.is-slam { animation: slam 0.42s cubic-bezier(.2, 1.4, .4, 1) both; }
 button.pad.is-gap {
+  appearance: none;
+  -webkit-appearance: none;
   min-height: 78px;
   border: none;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
   padding: 0;
-  color: #8a7358;
-  font-size: 1.6rem;
+  color: #241c16;
+  font-size: 2rem;
+  font-weight: 600;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -289,7 +295,7 @@ button.pad.is-gap {
 }
 
 @media (max-width: 1100px) {
-  .workspace { grid-template-columns: 1fr; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
   .top { flex-wrap: wrap; }
   .top-actions { margin-left: 0; }
 }

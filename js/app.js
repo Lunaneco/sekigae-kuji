@@ -177,6 +177,7 @@
     next.numberFrom = data.numberFrom === "right" ? "right" : "left";
     next.filledBy = data.filledBy === "left" || data.filledBy === "right" ? data.filledBy : "";
     next.sound = data.sound !== false;
+    if (data.mode === "gap") next.mode = "gap";
     next.nextId = Math.max(maxId, data.nextId | 0);
     state = next;
   }
@@ -233,7 +234,7 @@
     document.getElementById("numberFromLabel").hidden = !numberOrder;
     document.getElementById("numberHint").hidden = !numberOrder;
     document.getElementById("pinMode").setAttribute("aria-pressed", state.mode === "pin" ? "true" : "false");
-    document.getElementById("gapHint").hidden = document.getElementById("layoutMode").value !== "chart";
+    document.getElementById("gapHint").hidden = false;
     document.getElementById("swapMode").setAttribute("aria-pressed", state.mode === "swap" ? "true" : "false");
     document.getElementById("btnSound").setAttribute("aria-pressed", state.sound ? "true" : "false");
     document.getElementById("btnSound").textContent = state.sound ? "音あり" : "音なし";
@@ -376,9 +377,26 @@
   }
 
   function syncBoard() {
+    var room = document.getElementById("room");
+    var line = room && room.querySelector(".seat-line");
+    if (room && line) {
+      var label = line.parentElement.querySelector(".row-label");
+      var labelWidth = label ? label.offsetWidth + 8 : 0;
+      var count = line.children.length || 1;
+      var seat = Math.floor((room.clientWidth - labelWidth - 6 * Math.max(0, count - 1)) / count);
+      if (!isFinite(seat) || seat < 28) seat = 28;
+      if (seat > 92) seat = 92;
+      room.style.setProperty("--seat", seat + "px");
+      var guard = 0;
+      while (room.scrollWidth > room.clientWidth + 1 && seat > 28 && guard < 48) {
+        seat -= 1;
+        room.style.setProperty("--seat", seat + "px");
+        guard += 1;
+      }
+    }
     var board = document.getElementById("board");
     var width = 0;
-    document.querySelectorAll(".seat-line").forEach(function (line) { width = Math.max(width, line.offsetWidth); });
+    document.querySelectorAll(".seat-line").forEach(function (row) { width = Math.max(width, row.offsetWidth); });
     if (board && width) board.style.width = width + "px";
   }
 
@@ -494,7 +512,17 @@
     document.getElementById("gridBox").hidden = chart;
     document.getElementById("applyLayout").hidden = chart;
     document.getElementById("layoutPreview").hidden = chart;
-    document.getElementById("gapHint").hidden = !chart;
+    document.getElementById("gapHint").hidden = false;
+  }
+  function revealRoom() {
+    var room = document.getElementById("room");
+    var seat = room && room.querySelector(".seat, .is-gap");
+    if (!seat) return;
+    var bar = document.querySelector(".drawbar");
+    var barTop = bar ? bar.getBoundingClientRect().top : window.innerHeight;
+    var top = seat.getBoundingClientRect().top;
+    if (top >= 88 && top + seat.offsetHeight < barTop - 8) return;
+    window.scrollBy(0, top - 96);
   }
   function exitChart() {
     var select = document.getElementById("layoutMode");
@@ -712,11 +740,12 @@
     }
     if (pinned || grouped) flash("抜いた席についていた指定を外しました。");
     refresh();
+    revealRoom();
   }
 
   function onSeat(seatId) {
     if (busy) return;
-    if (isGap(seatId) || state.mode === "gap") { toggleGap(seatId); return; }
+    if (isGap(seatId)) { toggleGap(seatId); return; }
     if (state.mode === "pin") { pinTo(seatId); return; }
     if (state.mode === "group" && state.draft) { toggleDraftSeat(seatId); return; }
     if (state.mode === "swap" && state.assignment) {
@@ -729,7 +758,10 @@
       renderRoom();
       renderStatus();
       save();
+      return;
     }
+    if (state.mode === "pin" || state.mode === "group" || state.mode === "swap") return;
+    toggleGap(seatId);
   }
 
   function resolveSeat(row, col) {
@@ -1236,6 +1268,7 @@
       renderRoom();
       renderStatus();
       save();
+      if (chart) revealRoom();
     });
     ["gridRows", "gridCols"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
     document.getElementById("applyLayout").addEventListener("click", applyLayout);
@@ -1369,13 +1402,15 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !document.getElementById("ceremony").hidden) document.getElementById("skipCeremony").click();
     });
+    window.addEventListener("resize", syncBoard);
   }
 
   load();
   bind();
   document.getElementById("gridRows").value = String(state.rows.length || 4);
   document.getElementById("gridCols").value = String(state.rows[0] || 6);
-  document.getElementById("layoutMode").value = "grid";
+  document.getElementById("layoutMode").value = state.mode === "gap" ? "chart" : "grid";
   syncLayoutPanels();
   refresh();
+  revealRoom();
 })();
