@@ -170,13 +170,19 @@ input, select {
 }
 .seat.is-secret .seat-num, .seat.is-secret .seat-name, .seat.is-secret .seat-tag { opacity: 0; }
 .seat.is-slam { animation: slam 0.42s cubic-bezier(.2, 1.4, .4, 1) both; }
-.pad.is-gap {
+button.pad.is-gap {
   min-height: 78px;
-  border: 1px dashed #c4b49a;
-  border-radius: 10px;
-  background: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(90, 70, 40, 0.08) 6px 7px);
-  color: var(--muted);
-  font-size: 0.72rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: #8a7358;
+  font-size: 1.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .room.is-gapping .seat:hover { outline: 2px dashed #8a7358; }
 .aisle { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.72rem; }
@@ -318,4 +324,5 @@ input, select {
   .workspace { display: block; width: auto; padding: 0; }
   .panel { box-shadow: none; background: white; }
   .board, .seat.is-pin, .seat.is-group, .seat.is-girl { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .pad.is-gap { color: transparent !important; }
 }

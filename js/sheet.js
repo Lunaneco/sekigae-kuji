@@ -84,7 +84,7 @@
           return;
         }
         if (item.type === "gap") {
-          lineEl.appendChild(cell("span", "pad is-gap", ""));
+          lineEl.appendChild(cell("span", "pad", ""));
           return;
         }
         if (item.type === "aisle") {

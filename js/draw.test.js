@@ -195,7 +195,7 @@ const holeFile = X.posterFile({
   resolve: function (row, col) { return { number: String(col + 1), name: "人", kind: "open" }; }
 });
 const holeXml = sheetXmlOf(holeFile, "xl/worksheets/sheet1.xml");
-check("抜いた席はExcelに出さない", holeXml.indexOf('r="B3"') >= 0 && holeXml.indexOf('r="D3"') >= 0 && holeXml.indexOf('r="C3"') < 0);
+check("抜いた席はExcelに出さない", holeXml.indexOf('r="B3"') >= 0 && holeXml.indexOf('r="D3"') >= 0 && holeXml.indexOf('r="C3"') < 0 && holeXml.indexOf("×") < 0 && holeXml.indexOf('showGridLines="0"') >= 0);
 check("式として始まる文字を避ける", S.excelSafe("=1+1") === "'=1+1" && S.excelSafe("青葉") === "青葉");
 
 execFileSync("python3", ["-c", "open('/tmp/sekigae-sjis.csv','w',encoding='cp932').write('出席番号,氏名\\n1,青葉 湊\\n')"]);

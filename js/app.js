@@ -348,8 +348,9 @@
           hole.type = "button";
           hole.className = "pad is-gap";
           hole.dataset.seat = "r" + line.row + "c" + cell.col;
-          hole.textContent = state.mode === "gap" ? "戻す" : "";
-          hole.title = "抜いた席。座席表指定でもう一度クリックすると戻ります。";
+          hole.textContent = "×";
+          hole.setAttribute("aria-label", "抜いた席");
+          hole.title = "抜いた席。もう一度クリックすると戻ります。";
           lineEl.appendChild(hole);
           return;
         }
@@ -715,8 +716,7 @@
 
   function onSeat(seatId) {
     if (busy) return;
-    if (state.mode === "gap") { toggleGap(seatId); return; }
-    if (isGap(seatId)) return;
+    if (isGap(seatId) || state.mode === "gap") { toggleGap(seatId); return; }
     if (state.mode === "pin") { pinTo(seatId); return; }
     if (state.mode === "group" && state.draft) { toggleDraftSeat(seatId); return; }
     if (state.mode === "swap" && state.assignment) {

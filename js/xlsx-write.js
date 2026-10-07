@@ -179,7 +179,7 @@
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' +
       '<dimension ref="A1:' + colLetter(Math.max(1, maxCol)) + Math.max(1, maxRow) + '"/>' +
-      "<sheetViews><sheetView workbookViewId=\"0\"" + (selected ? ' tabSelected="1"' : "") + ">" + pane + "</sheetView></sheetViews>" +
+      "<sheetViews><sheetView workbookViewId=\"0\"" + (model.showGridLines === false ? ' showGridLines="0"' : "") + (selected ? ' tabSelected="1"' : "") + ">" + pane + "</sheetView></sheetViews>" +
       '<sheetFormatPr defaultRowHeight="18"/>' +
       "<cols>" + cols + "</cols><sheetData>" + data + "</sheetData>" +
       filter + merges +
@@ -324,6 +324,7 @@
       fitHeight: 1,
       centerVertical: true,
       fonts: metrics.fonts,
+      showGridLines: false,
       printArea: "$A$1:$" + colLetter(lastCol) + "$" + lastRow,
     };
   }
