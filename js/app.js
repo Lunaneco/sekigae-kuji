@@ -4,14 +4,6 @@
   var KEY = "sekigae-kuji-v1";
   var COLORS = ["#8e2f2a", "#21573f", "#2d4f78", "#8a5a12", "#5d4578", "#1f6a70"];
   var MAX_FILE = 5 * 1024 * 1024;
-  var SAMPLE = [
-    ["1", "青葉 湊"], ["2", "伊吹 早苗"], ["3", "宇佐見 蓮"], ["4", "江田 柊"],
-    ["5", "大野 結月"], ["6", "加賀 律"], ["7", "菊池 杏"], ["8", "工藤 碧"],
-    ["9", "小原 悠真"], ["10", "佐伯 芽依"], ["11", "篠原 湊太"], ["12", "白石 鈴"],
-    ["13", "菅井 旭"], ["14", "高野 美羽"], ["15", "千葉 航"], ["16", "寺田 葵"],
-    ["17", "中川 蓮"], ["18", "西山 紬"], ["19", "野村 蒼"], ["20", "長谷川 凛"],
-    ["21", "林田 芽"], ["22", "藤崎 朔"], ["23", "星野 陽菜"], ["24", "本田 律"]
-  ];
 
   var state = defaultState();
   var pending = null;
@@ -1468,10 +1460,6 @@
     document.getElementById("btnTeacher").addEventListener("click", saveTeacher);
     document.getElementById("btnBoth").addEventListener("click", function () { savePoster(); setTimeout(saveTeacher, 400); });
     document.getElementById("btnPrint").addEventListener("click", function () { window.print(); });
-    document.getElementById("btnSample").addEventListener("click", function () {
-      if (state.students.length && !window.confirm("いまの名簿をサンプルに入れ替えます。")) return;
-      addPeople(SAMPLE.map(function (row, index) { return { number: row[0], name: row[1], gender: index % 2 ? "男" : "女" }; }), true);
-    });
     document.getElementById("btnTemplate").addEventListener("click", templateFile);
     document.getElementById("btnSound").addEventListener("click", function () { state.sound = !state.sound; renderStatus(); save(); });
     document.getElementById("btnReset").addEventListener("click", function () {
