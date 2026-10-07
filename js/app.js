@@ -246,10 +246,18 @@
       number.value = student.number;
       number.maxLength = 20;
       number.setAttribute("aria-label", "番号");
-      var name = document.createElement("input");
-      name.value = student.name;
-      name.maxLength = 80;
-      name.setAttribute("aria-label", "名前");
+      var picking = state.mode === "group" && state.draft;
+      var name = document.createElement(picking ? "button" : "input");
+      if (picking) {
+        name.type = "button";
+        name.className = "pick-person";
+        name.dataset.pickStudent = student.id;
+        name.textContent = student.name;
+      } else {
+        name.value = student.name;
+        name.maxLength = 80;
+        name.setAttribute("aria-label", "名前");
+      }
       var gender = document.createElement("select");
       gender.setAttribute("aria-label", "性別");
       [["", "—"], ["男", "男"], ["女", "女"]].forEach(function (pair) {
@@ -264,7 +272,7 @@
       remove.textContent = "削除";
       remove.dataset.removeStudent = student.id;
       number.addEventListener("input", function () { onPersonEdit(student.id, "number", number.value); });
-      name.addEventListener("input", function () { onPersonEdit(student.id, "name", name.value); });
+      if (!picking) name.addEventListener("input", function () { onPersonEdit(student.id, "name", name.value); });
       gender.addEventListener("change", function () { onPersonEdit(student.id, "gender", gender.value); });
       item.append(number, name, gender, remove);
       var hay = (student.number + " " + student.name + " " + (student.gender || "")).toLowerCase();
@@ -278,8 +286,11 @@
   function paintPeople() {
     var draftIds = state.draft ? state.draft.studentIds : [];
     document.querySelectorAll(".person").forEach(function (el) {
-      el.classList.toggle("is-in-draft", draftIds.indexOf(el.dataset.id) >= 0);
+      var chosen = draftIds.indexOf(el.dataset.id) >= 0;
+      el.classList.toggle("is-in-draft", chosen);
       el.classList.toggle("is-locked", heldStudent(el.dataset.id));
+      var pick = el.querySelector("[data-pick-student]");
+      if (pick) pick.setAttribute("aria-pressed", chosen ? "true" : "false");
     });
   }
 
@@ -1411,18 +1422,22 @@
       }], false);
       event.target.reset();
     });
-    document.getElementById("roster").addEventListener("click", function (event) {
-      var remove = event.target.closest("[data-remove-student]");
-      if (remove) { removeStudent(remove.dataset.removeStudent); return; }
-      var person = event.target.closest(".person");
-      if (!person || event.target.closest("input, button, select")) return;
-      if (!(state.mode === "group" && state.draft)) return;
-      var id = person.dataset.id;
+    function toggleDraftStudent(id) {
+      if (!(state.mode === "group" && state.draft) || !id) return;
       if (heldStudent(id) && state.draft.studentIds.indexOf(id) < 0) { flash("この人はすでに指定されています。"); return; }
       toggle(state.draft.studentIds, id);
       paintPeople();
       updateDraftCount();
       save();
+    }
+    document.getElementById("roster").addEventListener("click", function (event) {
+      var remove = event.target.closest("[data-remove-student]");
+      if (remove) { removeStudent(remove.dataset.removeStudent); return; }
+      var pick = event.target.closest("[data-pick-student]");
+      if (pick) { toggleDraftStudent(pick.dataset.pickStudent); return; }
+      var person = event.target.closest(".person");
+      if (!person || event.target.closest("input, button, select")) return;
+      toggleDraftStudent(person.dataset.id);
     });
     document.getElementById("room").addEventListener("click", function (event) {
       var seat = event.target.closest("[data-seat]");
@@ -1491,7 +1506,7 @@
       state.draft = { studentIds: [], seatIds: [] };
       document.getElementById("draftName").value = "";
       updateDraftCount();
-      paintPeople();
+      renderRoster();
       renderRoom();
       renderStatus();
     });

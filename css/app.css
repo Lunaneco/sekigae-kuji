@@ -108,6 +108,17 @@ input, select {
 .person.is-in-draft { background: #fff1cc; }
 .person.is-locked { outline: 1px solid var(--line); }
 .person button, .rule-list button { padding: 0.3rem 0.55rem; }
+.person .pick-person {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffaf2;
+  color: var(--ink);
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+}
+.person.is-in-draft .pick-person { background: #fff1cc; border-color: var(--gold); font-weight: 700; }
+.person.is-locked .pick-person { color: var(--muted); }
 
 .view-switch { display: flex; gap: 0; }
 .view-switch button { border-radius: 0; border: 1px solid var(--line); background: #fffaf2; }
