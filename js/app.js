@@ -880,20 +880,33 @@
     if (!match) return { row: -1, col: -1 };
     return { row: Number(match[1]), col: Number(match[2]) };
   }
-  function showOrder(nodes) {
-    var list = [].slice.call(nodes);
-    var finale = null;
-    var best = null;
-    list.forEach(function (seat) {
-      var pos = seatPos(seat);
-      if (!best || pos.row > best.row || (pos.row === best.row && pos.col > best.col)) {
-        best = pos;
-        finale = seat;
+  function backRowIndex() {
+    var gaps = {};
+    state.gaps.forEach(function (id) { gaps[id] = 1; });
+    var row;
+    for (row = state.rows.length - 1; row >= 0; row -= 1) {
+      var cols = state.rows[row] || 0;
+      var col;
+      for (col = 0; col < cols; col += 1) {
+        if (!gaps["r" + row + "c" + col]) return row;
       }
-    });
-    var rest = shuffleNodes(list.filter(function (seat) { return seat !== finale; }));
-    if (finale) rest.push(finale);
-    return rest;
+    }
+    return Math.max(0, state.rows.length - 1);
+  }
+  function showOrder(nodes) {
+    return shuffleNodes([].slice.call(nodes));
+  }
+  function commentary(kind, index, total) {
+    if (kind === "open") return "名前が先に出ます。席はそのあとです";
+    if (kind === "done") return "全員、決まりました";
+    if (kind === "super-place") return "一番うしろ、この席です";
+    if (kind === "name") {
+      if (total > 1 && index === total - 1) return "最後の一人です";
+      var lines = ["この人は、どこに座るのでしょう", "名前が出ました。席はまだ秘密です", "席はどれでしょう", "次は誰でしょう", "さあ、どこだ"];
+      return lines[index % lines.length];
+    }
+    var places = ["そこです", "その席に決まりました", "決まりました", "その席です"];
+    return places[index % places.length];
   }
   function showPace(index, total) {
     var t = total <= 1 ? 1 : index / (total - 1);
@@ -924,6 +937,16 @@
     title.classList.remove("is-hit");
     void title.offsetWidth;
     title.classList.add("is-hit");
+  }
+  function setCall(text) {
+    var line = document.getElementById("revealCallText");
+    var box = document.getElementById("revealCall");
+    if (line) line.textContent = text || "";
+    if (!box) return;
+    box.classList.remove("is-hit");
+    void box.offsetWidth;
+    box.classList.add("is-hit");
+    callBlip();
   }
   function fitShowChart() {
     var room = document.getElementById("room");
@@ -956,13 +979,16 @@
   function runShow() {
     return new Promise(function (resolve) {
       var seats = showOrder(document.querySelectorAll(".seat[data-student]"));
+      var back = backRowIndex();
       var step = -1;
       var timer = 0;
+      var flashTimer = 0;
       var closed = false;
       function finish() {
         if (closed) return;
         closed = true;
         clearTimeout(timer);
+        clearTimeout(flashTimer);
         stopFx();
         document.getElementById("ceremony").hidden = true;
         document.body.classList.remove("is-reveal");
@@ -980,6 +1006,7 @@
       document.getElementById("ceremony").hidden = false;
       startFx();
       setCopy("席替え", "名前、それから席");
+      setCall(commentary("open", 0, seats.length));
       thud(78);
       burstAt(window.innerWidth * 0.5, 92, 90);
       function next() {
@@ -989,6 +1016,7 @@
         if (step >= seats.length) {
           setBannerSuper(false);
           setCopy("決定", seats.length ? seats.length + "人" : "");
+          setCall(commentary("done", 0, seats.length));
           stampDecide();
           burstAt(window.innerWidth * 0.5, window.innerHeight * 0.42, 180);
           thud(64);
@@ -998,23 +1026,27 @@
           return;
         }
         var seat = seats[step];
-        var finale = step === seats.length - 1;
-        var pace = finale ? { name: 980, hold: 1200 } : showPace(step, seats.length);
+        var backSeat = seatPos(seat).row === back;
+        var last = step === seats.length - 1;
+        var pace = showPace(step, seats.length);
         var count = (step + 1) + " / " + seats.length;
-        setBannerSuper(finale);
-        setCopy(seatLabel(seat), finale ? "最後の一人　" + count : count);
-        if (finale) {
-          burstAt(window.innerWidth * 0.5, 86, 150);
-          flashOnce();
-          shakeStage(true);
-          chargeSuper();
-        } else charge();
+        setBannerSuper(false);
+        setCopy(seatLabel(seat), (last ? "最後の一人　" : "") + count);
+        setCall(commentary("name", step, seats.length));
+        charge();
         timer = setTimeout(function () {
           if (closed) return;
           seat.classList.add("is-calling");
-          if (finale) seat.classList.add("is-finale");
-          setCopy(seatLabel(seat), (finale ? "一番うしろ　" : "") + seatPlace(seat) + "　" + count);
-          if (finale) chargeSuper();
+          if (backSeat) {
+            seat.classList.add("is-finale");
+            setBannerSuper(true);
+            burstAt(window.innerWidth * 0.5, 86, 150);
+            flashOnce();
+            shakeStage(true);
+            chargeSuper();
+          }
+          setCopy(seatLabel(seat), (backSeat ? "一番うしろ　" : "") + seatPlace(seat) + "　" + count);
+          setCall(commentary(backSeat ? "super-place" : "place", step, seats.length));
           timer = setTimeout(function () {
             if (closed) return;
             seat.classList.remove("is-secret", "is-calling");
@@ -1022,17 +1054,17 @@
             var rect = seat.getBoundingClientRect();
             var x = rect.left + rect.width / 2;
             var y = rect.top + rect.height / 2;
-            burstAt(x, y, finale ? 170 : 78);
+            burstAt(x, y, backSeat ? 170 : 78);
             flashOnce();
-            shakeStage(finale);
-            thud(finale ? 92 : 150 + Math.min(step, 18) * 8);
-            if (finale) {
+            shakeStage(backSeat);
+            thud(backSeat ? 92 : 150 + Math.min(step, 18) * 8);
+            if (backSeat) {
               burstAt(rect.left, rect.top, 70);
               burstAt(rect.right, rect.bottom, 70);
-              timer = setTimeout(function () { if (!closed) flashOnce(); }, 180);
+              if (last) flashTimer = setTimeout(function () { if (!closed) flashOnce(); }, 180);
             }
-            timer = setTimeout(next, pace.hold);
-          }, finale ? 460 : 180);
+            timer = setTimeout(next, backSeat ? Math.max(pace.hold, 880) : pace.hold);
+          }, backSeat ? 460 : 180);
         }, pace.name);
       }
       timer = setTimeout(next, 780);
@@ -1067,6 +1099,21 @@
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.34);
+  }
+  function callBlip() {
+    var ctx = audio();
+    if (!ctx) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(740, ctx.currentTime);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.09);
   }
   function charge() {
     var ctx = audio();

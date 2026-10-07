@@ -295,6 +295,29 @@ body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) satur
   text-align: center;
   color: #fff6d2;
 }
+.reveal-call {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.55em;
+  max-width: 46rem;
+  margin: 0 auto 2px;
+  min-height: 1.45em;
+  font-size: clamp(0.92rem, 2.1vw, 1.2rem);
+  line-height: 1.35;
+  color: #fffaf0;
+}
+.reveal-call-tag {
+  flex: none;
+  padding: 0.08em 0.5em;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #241c16;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.reveal-call.is-hit { animation: nameHit 0.2s cubic-bezier(.15, 1.45, .4, 1) both; }
 .reveal-kicker {
   margin: 0;
   min-height: 1.4em;
@@ -313,6 +336,10 @@ body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) satur
   text-shadow: 0 0 16px #ffb703, 0 0 42px #ff6a00, 0 6px 0 #6a2a00;
 }
 .reveal-name.is-hit { animation: nameHit 0.18s cubic-bezier(.15, 1.45, .4, 1) both; }
+.reveal-banner.is-super .reveal-call {
+  font-size: clamp(1.02rem, 2.5vw, 1.4rem);
+  text-shadow: 0 0 12px #ffb000;
+}
 .reveal-banner.is-super .reveal-kicker {
   position: relative;
   z-index: 2;
