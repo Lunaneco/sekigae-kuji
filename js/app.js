@@ -73,8 +73,18 @@
     for (var i = 0; i < state.groups.length; i += 1) if (state.groups[i].seatIds.indexOf(id) >= 0) return state.groups[i];
     return null;
   }
+  function groupIntact(group) {
+    var found = {};
+    Object.keys(state.assignment || {}).forEach(function (id) {
+      var person = state.assignment[id];
+      if (group.studentIds.indexOf(person) >= 0 && group.seatIds.indexOf(id) >= 0) found[person] = 1;
+    });
+    var i;
+    for (i = 0; i < group.studentIds.length; i += 1) if (!found[group.studentIds[i]]) return false;
+    return true;
+  }
   function howOf(seatId, studentId) {
-    if (!studentId) return groupForSeat(seatId) ? "指定席の空き" : "空席";
+    if (!studentId) return "空席";
     var pin = null;
     state.pins.forEach(function (item) { if (item.studentId === studentId) pin = item; });
     if (pin) return pin.seatId === seatId ? "固定" : "手直し";
@@ -84,7 +94,9 @@
       if (group.seatIds.indexOf(seatId) >= 0) return group.name ? "限定抽選（" + group.name + "）" : "限定抽選";
       return "手直し";
     }
-    if (heldSeat(seatId)) return "手直し";
+    if (state.pins.some(function (item) { return item.seatId === seatId; })) return "手直し";
+    var seatGroup = groupForSeat(seatId);
+    if (seatGroup && !groupIntact(seatGroup)) return "手直し";
     if (state.filledBy === "left") return "出席番号順（左はじ）";
     if (state.filledBy === "right") return "出席番号順（右はじ）";
     return "ランダム";
@@ -422,7 +434,7 @@
     if (student) button.dataset.student = student.id;
     if (student && student.gender === "女") button.classList.add("is-girl");
     if (pin) button.classList.add("is-pin");
-    if (group) {
+    if (group && (!state.assignment || (student && group.studentIds.indexOf(student.id) >= 0))) {
       button.classList.add("is-group");
       button.style.setProperty("--mark", group.color);
     }
@@ -694,7 +706,7 @@
     var seats = state.draft.seatIds.length;
     var note = "人と席を選んでください。";
     if (people > seats) note = "人が席より多いです。";
-    else if (people && seats > people) note = "余った" + (seats - people) + "席は空席のままです。他の人は座りません。";
+    else if (people && seats > people) note = "余った" + (seats - people) + "席は、残りの抽選に入ります。";
     else if (people && people === seats) note = "この" + people + "人を、この席の中だけで引きます。";
     box.textContent = people + "人 / " + seats + "席。" + note;
     document.getElementById("draftSave").disabled = !(people > 0 && seats >= people);
@@ -948,7 +960,6 @@
       phases.push({
         kind: "group",
         name: state.groups[index].name,
-        seatIds: state.groups[index].seatIds.slice(),
         groupIndex: groupIndex,
         seats: shuffleNodes(list)
       });
@@ -958,21 +969,9 @@
     return phases;
   }
   function coverShowSeats() {
-    document.querySelectorAll(".seat[data-student], .seat.is-group").forEach(function (seat) {
+    document.querySelectorAll(".seat[data-student]").forEach(function (seat) {
       seat.classList.add("is-secret");
     });
-  }
-  function unveilEmpty(phase) {
-    var ids = {};
-    (phase.seatIds || []).forEach(function (id) { ids[id] = 1; });
-    var found = false;
-    document.querySelectorAll(".seat.is-group.is-secret").forEach(function (seat) {
-      if (!ids[seat.dataset.seat] || seat.dataset.student) return;
-      seat.classList.remove("is-secret");
-      seat.classList.add("is-slam");
-      found = true;
-    });
-    return found;
   }
   function commentary(kind, index, total) {
     if (kind === "group-open") return index === 0 ? "この組だけ、先に引きます" : "次の組です";
@@ -984,7 +983,6 @@
       var groupPlaces = ["そこです", "その席に決まりました", "決まりました", "その席です"];
       return groupPlaces[index % groupPlaces.length];
     }
-    if (kind === "group-empty") return "余った席は、空席です";
     if (kind === "rest-open") return "ここから、残りの人です";
     if (kind === "open") return "名前が先に出ます。席はそのあとです";
     if (kind === "done") return "全員、決まりました";
@@ -1135,12 +1133,6 @@
         if (step >= 0 && seats[step]) seats[step].classList.remove("is-calling");
         step += 1;
         if (step >= seats.length) {
-          if (current && current.kind === "group" && unveilEmpty(current)) {
-            setBannerSuper(false);
-            setCall(commentary("group-empty", 0, seats.length));
-            timer = setTimeout(beginPhase, 700);
-            return;
-          }
           beginPhase();
           return;
         }

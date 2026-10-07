@@ -386,12 +386,17 @@
     }
     for (i = 0; i < groups.length; i += 1) {
       var group = groups[i];
-      var spare = group.seatIds.length - group.studentIds.length;
+      var openSeats = [];
+      for (j = 0; j < group.seatIds.length; j += 1) {
+        if (!reserved[group.seatIds[j]]) openSeats.push(group.seatIds[j]);
+      }
+      var spare = openSeats.length - group.studentIds.length;
       if (spare > 0) {
         var label = group.name ? "「" + group.name + "」" : "限定抽選";
-        warnings.push(label + "は席が" + spare + "席多いので、余った指定席は空席のままにします。");
+        warnings.push(label + "は席が" + spare + "席多いので、余った席は残りの抽選に入ります。");
       }
-      for (j = 0; j < group.seatIds.length; j += 1) reserved[group.seatIds[j]] = 1;
+      var take = Math.min(group.studentIds.length, openSeats.length);
+      for (j = 0; j < take; j += 1) reserved[openSeats[j]] = 1;
       for (j = 0; j < group.studentIds.length; j += 1) heldStudents[group.studentIds[j]] = 1;
     }
     var freeSeats = 0;
@@ -519,17 +524,23 @@
         usedStudents[pins[i].studentId] = 1;
         reservedSeats[pins[i].seatId] = 1;
       }
+      var groupPools = [];
       for (i = 0; i < groups.length; i += 1) {
         var group = groups[i];
         var people = numberOrder ? group.studentIds.slice().sort(comparePeople) : shuffle(group.studentIds, random);
         var seatPool = numberOrder ? group.seatIds.slice().sort(compareSeats) : shuffle(group.seatIds, random);
-        var n = people.length;
+        var used = [];
+        var personAt = 0;
         var k;
-        for (k = 0; k < n; k += 1) {
-          assignment[seatPool[k]] = people[k];
-          usedStudents[people[k]] = 1;
+        for (k = 0; k < seatPool.length && personAt < people.length; k += 1) {
+          if (reservedSeats[seatPool[k]]) continue;
+          assignment[seatPool[k]] = people[personAt];
+          usedStudents[people[personAt]] = 1;
+          reservedSeats[seatPool[k]] = 1;
+          used.push(seatPool[k]);
+          personAt += 1;
         }
-        for (k = 0; k < group.seatIds.length; k += 1) reservedSeats[group.seatIds[k]] = 1;
+        if (used.length) groupPools.push(used);
       }
       var restPeople = [];
       for (i = 0; i < students.length; i += 1) {
@@ -543,16 +554,16 @@
       restSeats = numberOrder ? restSeats.sort(compareSeats) : shuffle(restSeats, random);
       var pairCount = Math.min(restPeople.length, restSeats.length);
       for (i = 0; i < pairCount; i += 1) assignment[restSeats[i]] = restPeople[i];
-      return { assignment: assignment, unseated: restPeople.slice(pairCount), pools: poolMap(restSeats, groups) };
+      return { assignment: assignment, unseated: restPeople.slice(pairCount), pools: poolMap(restSeats, groupPools) };
     }
 
-    function poolMap(restSeats, groupList) {
+    function poolMap(restSeats, groupPools) {
       var map = {};
       var i;
       var k;
       for (i = 0; i < restSeats.length; i += 1) map[restSeats[i]] = restSeats;
-      for (i = 0; i < groupList.length; i += 1) {
-        var ids = groupList[i].seatIds;
+      for (i = 0; i < groupPools.length; i += 1) {
+        var ids = groupPools[i];
         for (k = 0; k < ids.length; k += 1) map[ids[k]] = ids;
       }
       return map;

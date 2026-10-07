@@ -82,17 +82,39 @@ const poolSeen = { r0c0: 0, r0c1: 0, r0c2: 0 };
 let poolBad = 0;
 for (let n = 0; n < 80; n += 1) {
   const drawn = S.draw(poolStudents, poolSeats, [], poolGroup, rng(n + 9));
-  const occupied = Object.keys(drawn.assignment);
-  const empty = ["r0c0", "r0c1", "r0c2"].filter((id) => !drawn.assignment[id]);
-  if (!drawn.ok || occupied.length !== 2 || empty.length !== 1) poolBad += 1;
-  ["a", "b"].forEach((id) => {
-    if (occupied.indexOf(Object.keys(drawn.assignment).find((key) => drawn.assignment[key] === id)) < 0) poolBad += 1;
-  });
-  if (drawn.assignment.r0c0 === "c" || drawn.assignment.r0c1 === "c" || drawn.assignment.r0c2 === "c") poolBad += 1;
-  if (drawn.unseated.indexOf("c") < 0) poolBad += 1;
-  if (empty.length === 1) poolSeen[empty[0]] += 1;
+  const seatOf = {};
+  Object.keys(drawn.assignment).forEach((key) => { seatOf[drawn.assignment[key]] = key; });
+  const ids = ["r0c0", "r0c1", "r0c2"];
+  if (!drawn.ok || drawn.unseated.length || Object.keys(drawn.assignment).length !== 3) poolBad += 1;
+  ["a", "b", "c"].forEach((id) => { if (ids.indexOf(seatOf[id]) < 0) poolBad += 1; });
+  if (seatOf.a === seatOf.b || seatOf.a === seatOf.c || seatOf.b === seatOf.c) poolBad += 1;
+  if (seatOf.c) poolSeen[seatOf.c] += 1;
 }
-check("席が多い組は、その席の中だけで空く", poolBad === 0 && poolSeen.r0c0 > 0 && poolSeen.r0c1 > 0 && poolSeen.r0c2 > 0);
+check("余った席は残りの人に渡る", poolBad === 0 && poolSeen.r0c0 > 0 && poolSeen.r0c1 > 0 && poolSeen.r0c2 > 0);
+const spareOrder = S.draw(
+  [{ id: "a", number: "2", name: "a" }, { id: "b", number: "1", name: "b" }, { id: "c", number: "3", name: "c" }],
+  S.makeSeats([3]), [], [{ studentIds: ["a", "b"], seatIds: ["r0c0", "r0c1", "r0c2"] }], rng(1), { numberOrder: "left" }
+);
+check("余った席も番号順に入る", spareOrder.assignment.r0c0 === "b" && spareOrder.assignment.r0c1 === "a" && spareOrder.assignment.r0c2 === "c");
+const spareWarn = S.warningsFor(poolStudents, poolSeats, [], poolGroup);
+check("余った席の注意", spareWarn.some((line) => line.indexOf("余った席は残りの抽選に入ります") >= 0));
+const evenWarn = S.warningsFor(students, seats, [], groups);
+check("席が同じなら余りの注意はない", evenWarn.every((line) => line.indexOf("余った席") < 0));
+const mixPeople = ["a", "b", "c", "d"].map((id, i) => ({ id, number: String(i + 1), name: "名" + id, gender: i % 2 === 0 ? "男" : "女" }));
+const mixGroup = [{ studentIds: ["a"], seatIds: ["r0c0", "r0c1"] }];
+const mixSeen = { r0c0: 0, r0c1: 0 };
+let mixBad = 0;
+for (let n = 0; n < 40; n += 1) {
+  const drawn = S.draw(mixPeople, S.makeSeats([2, 2]), [], mixGroup, rng(n + 11), { avoidOpposite: true, neighbors: S.seatNeighbors([2, 2]) });
+  const seatOf = {};
+  Object.keys(drawn.assignment).forEach((key) => { seatOf[drawn.assignment[key]] = key; });
+  if (!drawn.ok || drawn.unseated.length || Object.keys(drawn.assignment).length !== 4) mixBad += 1;
+  if (seatOf.a !== "r0c0" && seatOf.a !== "r0c1") mixBad += 1;
+  const leftover = seatOf.a === "r0c0" ? "r0c1" : "r0c0";
+  if (!drawn.assignment[leftover] || drawn.assignment[leftover] === "a") mixBad += 1;
+  if (drawn.assignment[leftover]) mixSeen[leftover] += 1;
+}
+check("余った席は性別の入れ替えにも残る", mixBad === 0 && mixSeen.r0c0 > 0 && mixSeen.r0c1 > 0);
 
 const matrix = [["クラス名簿"], ["出席番号", "ふりがな", "氏名"], [1, "あおば", "青葉 湊"], [2, "いぶき", "伊吹 早苗"]];
 const guess = S.guessMapping(matrix);
