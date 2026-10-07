@@ -198,6 +198,25 @@ const numberAt = listSheet.indexOf(">番号<");
 const nameAt = listSheet.indexOf(">名前<");
 const genderAt = listSheet.indexOf(">性別<");
 check("一覧は番号・名前・性別の順", numberAt >= 0 && numberAt < nameAt && nameAt < genderAt && listSheet.indexOf(">女<") > genderAt && listSheet.indexOf("A1:G") >= 0 && workbookXml.indexOf("$G$") >= 0);
+const girlPoster = X.posterFile({
+  caption: "網掛け",
+  header: "網掛け",
+  grid: S.buildChartGrid([2], {}),
+  resolve: function (row, col) {
+    if (col === 0) return { number: "1", name: "青葉", kind: "open", gender: "女" };
+    return { number: "2", name: "伊吹", kind: "pin", gender: "女" };
+  }
+});
+const girlXml = sheetXmlOf(girlPoster, "xl/worksheets/sheet1.xml");
+const girlStyles = sheetXmlOf(girlPoster, "xl/styles.xml");
+check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="C3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0);
+const boyXml = sheetXmlOf(X.posterFile({
+  caption: "男",
+  header: "男",
+  grid: S.buildChartGrid([1], {}),
+  resolve: function () { return { number: "1", name: "蓮", kind: "open", gender: "男" }; }
+}), "xl/worksheets/sheet1.xml");
+check("男子の席は網掛けしない", boyXml.indexOf('s="10"') < 0 && boyXml.indexOf('s="3"') >= 0);
 
 const before = Object.keys(Object.prototype).length;
 XLSX.read(fs.readFileSync("/tmp/sekigae-poster.xlsx"), { type: "array", cellFormula: false, cellHTML: false, bookVBA: false });

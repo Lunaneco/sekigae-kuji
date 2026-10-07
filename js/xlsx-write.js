@@ -111,7 +111,7 @@
       '<font><sz val="' + aisle + '"/><color rgb="FF415064"/><name val="游ゴシック"/><charset val="128"/></font>' +
       '<font><b/><sz val="12"/><color rgb="FFF6F0E4"/><name val="游ゴシック"/><charset val="128"/></font>' +
       "</fonts>" +
-      '<fills count="9">' +
+      '<fills count="12">' +
       '<fill><patternFill patternType="none"/></fill>' +
       '<fill><patternFill patternType="gray125"/></fill>' +
       '<fill><patternFill patternType="solid"><fgColor rgb="FF1B3A32"/></patternFill></fill>' +
@@ -121,12 +121,15 @@
       '<fill><patternFill patternType="solid"><fgColor rgb="FFF8E8C8"/></patternFill></fill>' +
       '<fill><patternFill patternType="solid"><fgColor rgb="FFD5DDE6"/></patternFill></fill>' +
       '<fill><patternFill patternType="solid"><fgColor rgb="FF243044"/></patternFill></fill>' +
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFFBF6EA"/></patternFill></fill>' +
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFF8E4E0"/></patternFill></fill>' +
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFF8E8C8"/></patternFill></fill>' +
       "</fills>" +
       '<borders count="2"><border><left/><right/><top/><bottom/></border>' +
       '<border><left style="thin"><color rgb="FF2A241C"/></left><right style="thin"><color rgb="FF2A241C"/></right>' +
       '<top style="thin"><color rgb="FF2A241C"/></top><bottom style="thin"><color rgb="FF2A241C"/></bottom></border></borders>' +
       '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-      '<cellXfs count="10">' +
+      '<cellXfs count="13">' +
       '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
       '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
       '<xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
@@ -137,6 +140,9 @@
       '<xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
       '<xf numFmtId="0" fontId="6" fillId="8" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
       '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
+      '<xf numFmtId="0" fontId="3" fillId="9" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+      '<xf numFmtId="0" fontId="3" fillId="10" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+      '<xf numFmtId="0" fontId="3" fillId="11" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
       "</cellXfs></styleSheet>"
     );
   }
@@ -232,7 +238,8 @@
     if (!info || !info.name) return { value: "空席", style: 4 };
     var number = info.number ? String(info.number) : "";
     var name = String(info.name);
-    var style = info.kind === "pin" ? 5 : info.kind === "group" ? 6 : 3;
+    var girl = info.gender === "女";
+    var style = info.kind === "pin" ? (girl ? 11 : 5) : info.kind === "group" ? (girl ? 12 : 6) : (girl ? 10 : 3);
     return { value: number ? number + "\n" + name : name, style: style };
   }
 

@@ -344,6 +344,7 @@
     button.className = "seat";
     button.dataset.seat = seatId;
     if (student) button.dataset.student = student.id;
+    if (student && student.gender === "女") button.classList.add("is-girl");
     if (pin) button.classList.add("is-pin");
     if (group) {
       button.classList.add("is-group");
@@ -554,6 +555,11 @@
         if (node) node.textContent = student[field];
       });
     }
+    if (field === "gender") {
+      document.querySelectorAll(".seat").forEach(function (seat) {
+        if (seat.dataset.student === id) seat.classList.toggle("is-girl", student.gender === "女");
+      });
+    }
     var option = document.querySelector('#pinStudent option[value="' + id + '"]');
     if (option) option.textContent = (student.number ? student.number + " " : "") + student.name + (student.gender ? "（" + student.gender + "）" : "");
     save();
@@ -734,7 +740,7 @@
     var student = studentId ? studentById(studentId) : null;
     if (!student) return null;
     var how = howOf(seatId, studentId);
-    return { number: student.number, name: student.name, kind: kindOf(how) };
+    return { number: student.number, name: student.name, kind: kindOf(how), gender: student.gender || "" };
   }
   function teacherList() {
     var list = [];

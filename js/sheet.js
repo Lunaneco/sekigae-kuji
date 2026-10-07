@@ -97,6 +97,7 @@
         var seatId = "r" + line.row + "c" + item.col;
         var student = state.assignment ? state.students[state.assignment[seatId]] : null;
         var seat = cell("div", "seat", "");
+        if (student && student.gender === "女") seat.classList.add("is-girl");
         seat.append(
           cell("span", "seat-coord", String(shown)),
           cell("span", "seat-num", student ? student.number : ""),

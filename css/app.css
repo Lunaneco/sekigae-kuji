@@ -149,6 +149,12 @@ input, select {
   padding: 6px;
   position: relative;
 }
+.seat.is-girl {
+  background-color: #fffaf2;
+  background-image:
+    repeating-linear-gradient(-45deg, transparent 0 4px, rgba(70, 48, 32, 0.2) 4px 5px),
+    linear-gradient(#fffaf2, #f3ead7);
+}
 .seat-coord { position: absolute; top: 4px; left: 6px; font-size: 0.68rem; color: var(--muted); }
 .seat-num { font-size: 0.72rem; color: var(--muted); }
 .seat-name { font-size: 0.92rem; text-align: center; line-height: 1.25; max-width: 100%; overflow: hidden; }
@@ -300,5 +306,5 @@ input, select {
   body { background: white; }
   .workspace { display: block; width: auto; padding: 0; }
   .panel { box-shadow: none; background: white; }
-  .board, .seat.is-pin, .seat.is-group { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .board, .seat.is-pin, .seat.is-group, .seat.is-girl { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
