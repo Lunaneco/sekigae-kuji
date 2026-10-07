@@ -1166,6 +1166,12 @@
     });
     document.getElementById("btnDraw").addEventListener("click", function () { draw(true); });
     document.getElementById("btnQuiet").addEventListener("click", function () { draw(false); });
+    document.getElementById("openPoster").addEventListener("click", function (event) {
+      if (!state.assignment) { event.preventDefault(); flash("先に席替えをしてください。"); }
+    });
+    document.getElementById("openTeacher").addEventListener("click", function (event) {
+      if (!state.assignment) { event.preventDefault(); flash("先に席替えをしてください。"); }
+    });
     document.getElementById("btnPoster").addEventListener("click", savePoster);
     document.getElementById("btnTeacher").addEventListener("click", saveTeacher);
     document.getElementById("btnBoth").addEventListener("click", function () { savePoster(); setTimeout(saveTeacher, 400); });

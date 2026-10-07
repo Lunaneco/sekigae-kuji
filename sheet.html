@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>座席表</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="sheet-page">
+  <header class="sheet-bar">
+    <p id="caption"></p>
+    <div class="draw-actions">
+      <a id="back" href="index.html">席替えに戻る</a>
+      <a id="switchView" href="sheet.html?view=teacher">教員用を開く</a>
+      <button type="button" id="printSheet">印刷</button>
+    </div>
+  </header>
+  <main id="chart" class="room"></main>
+  <section id="extra" class="sheet-extra" hidden></section>
+  <script src="js/draw.js"></script>
+  <script src="js/sheet.js"></script>
+</body>
+</html>
