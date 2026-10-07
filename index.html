@@ -96,6 +96,8 @@
         <button type="button" id="applyLayout" class="solid">この座席にする</button>
         <p id="layoutPreview" class="hint"></p>
         <label class="check"><input id="aisle" type="checkbox"> 中央に通路を空ける</label>
+        <button type="button" id="gapMode" aria-pressed="false">席を抜く</button>
+        <p id="gapHint" class="hint" hidden>前や途中の席をクリックすると、その位置を空けたまま外せます。抜いた席をもう一度クリックすると戻ります。隣の席は詰めません。</p>
         <div class="view-switch" role="group" aria-label="座席の見方">
           <button type="button" id="viewPoster" aria-pressed="true">掲示用</button>
           <button type="button" id="viewTeacher" aria-pressed="false">教員用</button>
@@ -139,7 +141,7 @@
         <summary>使い方</summary>
         <ol>
           <li>名簿を読み、番号、名前、性別の列を確認します。性別の列はなくても引きます。</li>
-          <li>行と列、座席数、行ごと、または列ごとの席数を決めます。短い行は黒板の中央に揃います。</li>
+          <li>行と列、座席数、行ごと、または列ごとの席数を決めます。短い行は黒板の中央に揃います。「席を抜く」で、前や途中の席を位置ごと外せます。</li>
           <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。「周りが異性だけにならない」にすると、上下左右が異性だけになる席を避けます。通路の向こうは隣になりません。</li>
           <li>席替えすると演出のあと席が決まります。決め方で出席番号順を選ぶと、前の行から左はじ、または右はじへ番号順に座ります。左はじは黒板に向かって左です。</li>
           <li>掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>

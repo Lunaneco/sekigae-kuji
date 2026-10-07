@@ -294,7 +294,7 @@
       var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
       line.cells.forEach(function (cell, index) {
         var col = index + 2;
-        if (cell.type === "pad") return;
+        if (cell.type === "pad" || cell.type === "gap") return;
         if (cell.type === "aisle") {
           cells.push({ col: col, value: "通路", style: 7 });
           return;

@@ -170,6 +170,15 @@ input, select {
 }
 .seat.is-secret .seat-num, .seat.is-secret .seat-name, .seat.is-secret .seat-tag { opacity: 0; }
 .seat.is-slam { animation: slam 0.42s cubic-bezier(.2, 1.4, .4, 1) both; }
+.pad.is-gap {
+  min-height: 78px;
+  border: 1px dashed #c4b49a;
+  border-radius: 10px;
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(90, 70, 40, 0.08) 6px 7px);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.room.is-gapping .seat:hover { outline: 2px dashed #8a7358; }
 .aisle { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.72rem; }
 .unseated { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .unseated h3 { width: 100%; margin: 0; font-size: 0.95rem; }

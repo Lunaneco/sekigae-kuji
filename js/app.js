@@ -24,7 +24,7 @@
     return {
       v: 1, students: [], rows: [6, 6, 6, 6], columns: null, pins: [], groups: [],
       assignment: null, unseated: [], history: null, aisle: false, teacherView: false,
-      avoidOpposite: false, assignMode: "random", numberFrom: "left", filledBy: "",
+      avoidOpposite: false, assignMode: "random", numberFrom: "left", filledBy: "", gaps: [],
       sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
     };
   }
@@ -40,7 +40,25 @@
     for (var i = 0; i < state.students.length; i += 1) if (state.students[i].id === id) return state.students[i];
     return null;
   }
-  function seatsNow() { return Sekigae.makeSeats(state.rows, state.columns); }
+  function seatsNow() {
+    var gaps = {};
+    state.gaps.forEach(function (id) { gaps[id] = 1; });
+    return Sekigae.makeSeats(state.rows, state.columns).filter(function (seat) { return !gaps[seat.id]; });
+  }
+  function isGap(id) {
+    return state.gaps.indexOf(id) >= 0;
+  }
+  function chartGrid(mirror) {
+    return Sekigae.buildChartGrid(state.rows, {
+      aisle: state.aisle,
+      mirror: !!mirror,
+      columns: state.columns,
+      gaps: state.gaps
+    });
+  }
+  function neighborMap() {
+    return Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns, gaps: state.gaps });
+  }
   function seatCountInRow(row) {
     var n = 0;
     seatsNow().forEach(function (seat) { if (seat.row === row) n += 1; });
@@ -123,6 +141,16 @@
     next.students.forEach(function (s) { knownS[s.id] = 1; });
     var knownSeat = {};
     Sekigae.makeSeats(next.rows, next.columns).forEach(function (seat) { knownSeat[seat.id] = 1; });
+    if (Array.isArray(data.gaps)) {
+      var seenGap = {};
+      data.gaps.forEach(function (id) {
+        if (typeof id === "string" && /^r\d+c\d+$/.test(id) && knownSeat[id] && !seenGap[id]) {
+          seenGap[id] = 1;
+          next.gaps.push(id);
+          delete knownSeat[id];
+        }
+      });
+    }
     if (Array.isArray(data.pins)) {
       data.pins.forEach(function (pin) {
         if (knownS[pin.studentId] && knownSeat[pin.seatId]) next.pins.push({ studentId: pin.studentId, seatId: pin.seatId });
@@ -188,8 +216,9 @@
     var bits = ["名簿 " + state.students.length + "人", describe(state.rows, state.columns)];
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
+    if (state.gaps.length) bits.push("抜き " + state.gaps.length + "席");
     var oppositeLeft = state.avoidOpposite && state.assignment
-      ? Sekigae.countOpposite(state.students, state.assignment, Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns }))
+      ? Sekigae.countOpposite(state.students, state.assignment, neighborMap())
       : 0;
     if (oppositeLeft > 0) bits.push("周りが異性だけの席が" + oppositeLeft + "人分残っています");
     document.getElementById("status").textContent = bits.concat(report.errors, report.warnings).join(" / ");
@@ -208,6 +237,8 @@
     document.getElementById("numberFromLabel").hidden = !numberOrder;
     document.getElementById("numberHint").hidden = !numberOrder;
     document.getElementById("pinMode").setAttribute("aria-pressed", state.mode === "pin" ? "true" : "false");
+    document.getElementById("gapMode").setAttribute("aria-pressed", state.mode === "gap" ? "true" : "false");
+    document.getElementById("gapHint").hidden = state.mode !== "gap";
     document.getElementById("swapMode").setAttribute("aria-pressed", state.mode === "swap" ? "true" : "false");
     document.getElementById("btnSound").setAttribute("aria-pressed", state.sound ? "true" : "false");
     document.getElementById("btnSound").textContent = state.sound ? "音あり" : "音なし";
@@ -283,8 +314,9 @@
   }
 
   function renderRoom() {
-    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: state.teacherView, columns: state.columns });
+    var grid = chartGrid(state.teacherView);
     var room = document.getElementById("room");
+    room.classList.toggle("is-gapping", state.mode === "gap");
     room.textContent = "";
     var stack = document.createElement("div");
     stack.className = "room-stack";
@@ -314,6 +346,16 @@
           var pad = document.createElement("span");
           pad.className = "pad";
           lineEl.appendChild(pad);
+          return;
+        }
+        if (cell.type === "gap") {
+          var hole = document.createElement("button");
+          hole.type = "button";
+          hole.className = "pad is-gap";
+          hole.dataset.seat = "r" + line.row + "c" + cell.col;
+          hole.textContent = state.mode === "gap" ? "戻す" : "";
+          hole.title = "抜いた席。席を抜くをもう一度押してから戻します。";
+          lineEl.appendChild(hole);
           return;
         }
         if (cell.type === "aisle") {
@@ -611,13 +653,14 @@
     var next = proposedRows();
     if (!next.ok) { flash(next.error); return; }
     var known = {};
-    Sekigae.makeSeats(next.rows).forEach(function (seat) { known[seat.id] = 1; });
+    Sekigae.makeSeats(next.rows, next.columns).forEach(function (seat) { known[seat.id] = 1; });
     var lost = state.pins.some(function (pin) { return !known[pin.seatId]; }) || state.groups.some(function (group) {
       return group.seatIds.some(function (id) { return !known[id]; });
     });
     if (lost && !window.confirm("座席を変えると、はみ出す固定席と限定抽選を外します。")) return;
     state.rows = next.rows;
     state.columns = next.columns || null;
+    state.gaps = state.gaps.filter(function (id) { return known[id]; });
     pruneToSeats();
     renderCustomRows(state.rows.slice());
     renderCustomCols(state.columns || columnsFromRows(state.rows));
@@ -734,8 +777,40 @@
     if (personId) state.assignment[seatId] = personId;
   }
 
+  function toggleGap(seatId) {
+    var index = state.gaps.indexOf(seatId);
+    if (index >= 0) {
+      state.gaps.splice(index, 1);
+      refresh();
+      return;
+    }
+    var exists = false;
+    Sekigae.makeSeats(state.rows, state.columns).forEach(function (seat) { if (seat.id === seatId) exists = true; });
+    if (!exists) return;
+    if (seatsNow().length <= 1) { flash("席は1つ以上残してください。"); return; }
+    var pinned = state.pins.some(function (pin) { return pin.seatId === seatId; });
+    var grouped = state.groups.some(function (group) { return group.seatIds.indexOf(seatId) >= 0; });
+    state.gaps.push(seatId);
+    state.pins = state.pins.filter(function (pin) { return pin.seatId !== seatId; });
+    state.groups.forEach(function (group) {
+      group.seatIds = group.seatIds.filter(function (id) { return id !== seatId; });
+    });
+    state.groups = state.groups.filter(function (group) {
+      return group.seatIds.length && group.studentIds.length && group.studentIds.length <= group.seatIds.length;
+    });
+    if (state.draft) state.draft.seatIds = state.draft.seatIds.filter(function (id) { return id !== seatId; });
+    if (state.assignment && state.assignment[seatId]) {
+      state.unseated.push(state.assignment[seatId]);
+      delete state.assignment[seatId];
+    }
+    if (pinned || grouped) flash("抜いた席についていた指定を外しました。");
+    refresh();
+  }
+
   function onSeat(seatId) {
     if (busy) return;
+    if (state.mode === "gap") { toggleGap(seatId); return; }
+    if (isGap(seatId)) return;
     if (state.mode === "pin") { pinTo(seatId); return; }
     if (state.mode === "group" && state.draft) { toggleDraftSeat(seatId); return; }
     if (state.mode === "swap" && state.assignment) {
@@ -786,7 +861,7 @@
     return {
       caption: caption,
       header: header,
-      grid: Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: mirror, columns: state.columns }),
+      grid: chartGrid(mirror),
       resolve: resolveSeat,
       list: teacherList()
     };
@@ -825,7 +900,7 @@
       drawOptions.numberOrder = state.numberFrom === "right" ? "right" : "left";
     } else if (state.avoidOpposite) {
       drawOptions.avoidOpposite = true;
-      drawOptions.neighbors = Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns });
+      drawOptions.neighbors = neighborMap();
     }
     var result = Sekigae.draw(state.students, report.seats, state.pins, state.groups, null, drawOptions);
     if (!result.ok) { flash(result.errors[0] || "引けませんでした。"); return; }
@@ -861,7 +936,7 @@
         ? "出席番号順に、右はじから席が決まりました。"
         : "席が決まりました。";
     if (state.filledBy || !state.avoidOpposite || !state.assignment) return head;
-    var left = Sekigae.countOpposite(state.students, state.assignment, Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns }));
+    var left = Sekigae.countOpposite(state.students, state.assignment, neighborMap());
     if (left > 0) return "席が決まりました。周りが異性だけの席が" + left + "人分残っています。";
     return "席が決まりました。";
   }
@@ -1284,6 +1359,13 @@
     });
     document.getElementById("viewPoster").addEventListener("click", function () { state.teacherView = false; renderRoom(); renderStatus(); save(); });
     document.getElementById("viewTeacher").addEventListener("click", function () { state.teacherView = true; renderRoom(); renderStatus(); save(); });
+    document.getElementById("gapMode").addEventListener("click", function () {
+      if (state.draft && (state.draft.studentIds.length || state.draft.seatIds.length)) { flash("作りかけの限定抽選を先に確定してください。"); return; }
+      state.draft = null;
+      state.mode = state.mode === "gap" ? "view" : "gap";
+      renderStatus();
+      renderRoom();
+    });
     document.getElementById("pinMode").addEventListener("click", function () {
       if (state.draft && (state.draft.studentIds.length || state.draft.seatIds.length)) { flash("作りかけの限定抽選を先に確定してください。"); return; }
       state.draft = null;

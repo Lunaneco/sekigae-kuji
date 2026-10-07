@@ -678,6 +678,7 @@
         }
         columnLines.push({ row: n, cells: cells });
       }
+      markGaps(columnLines, options && options.gaps);
       return { maxSlots: slots.length, lines: columnLines };
     }
     var lines = [];
@@ -699,7 +700,24 @@
       while (cells.length < maxSlots) cells.push({ type: "pad" });
       lines[r].cells = cells;
     }
+    markGaps(lines, options && options.gaps);
     return { maxSlots: maxSlots, lines: lines };
+  }
+
+  function markGaps(lines, gaps) {
+    if (!gaps || !gaps.length) return;
+    var set = {};
+    var i;
+    for (i = 0; i < gaps.length; i += 1) set[String(gaps[i])] = 1;
+    var r;
+    var c;
+    for (r = 0; r < lines.length; r += 1) {
+      var cells = lines[r].cells;
+      for (c = 0; c < cells.length; c += 1) {
+        var cell = cells[c];
+        if (cell.type === "seat" && set["r" + lines[r].row + "c" + cell.col]) cell.type = "gap";
+      }
+    }
   }
 
   function seatNeighbors(rowCounts, options) {

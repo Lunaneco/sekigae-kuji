@@ -176,6 +176,26 @@ const priority = S.draw(
   { numberOrder: "left", avoidOpposite: true, neighbors: S.seatNeighbors([2, 2]) }
 );
 check("番号順は性別指定より優先", priority.assignment.r0c0 === "a" && priority.assignment.r0c1 === "b" && priority.assignment.r1c0 === "c" && priority.assignment.r1c1 === "d");
+const middleGap = S.buildChartGrid([4], { gaps: ["r0c1"] });
+check("途中の席を抜いても列は動かない", middleGap.lines[0].cells.map((cell) => cell.type).join() === "seat,gap,seat,seat" && middleGap.lines[0].cells[2].col === 2);
+const frontGap = S.buildChartGrid([2, 2], { gaps: ["r0c0"] });
+check("前の席を抜ける", frontGap.lines[0].cells[0].type === "gap" && frontGap.lines[0].cells[1].type === "seat" && frontGap.lines[1].cells[0].type === "seat");
+const gapNeighbors = S.seatNeighbors([4], { gaps: ["r0c1"] });
+check("抜いた席の向こうは隣にならない", gapNeighbors.r0c0.indexOf("r0c2") < 0 && !gapNeighbors.r0c1);
+const skipped = S.draw(
+  [{ id: "a", number: "1", name: "a" }, { id: "b", number: "2", name: "b" }, { id: "c", number: "3", name: "c" }],
+  S.makeSeats([2, 2]).filter((seat) => seat.id !== "r0c0"),
+  [], [], rng(1), { numberOrder: "left" }
+);
+check("抜いた前の席を飛ばして番号順", skipped.assignment.r0c1 === "a" && skipped.assignment.r1c0 === "b" && skipped.assignment.r1c1 === "c" && !skipped.assignment.r0c0);
+const holeFile = X.posterFile({
+  caption: "抜き",
+  header: "抜き",
+  grid: S.buildChartGrid([3], { gaps: ["r0c1"] }),
+  resolve: function (row, col) { return { number: String(col + 1), name: "人", kind: "open" }; }
+});
+const holeXml = sheetXmlOf(holeFile, "xl/worksheets/sheet1.xml");
+check("抜いた席はExcelに出さない", holeXml.indexOf('r="B3"') >= 0 && holeXml.indexOf('r="D3"') >= 0 && holeXml.indexOf('r="C3"') < 0);
 check("式として始まる文字を避ける", S.excelSafe("=1+1") === "'=1+1" && S.excelSafe("青葉") === "青葉");
 
 execFileSync("python3", ["-c", "open('/tmp/sekigae-sjis.csv','w',encoding='cp932').write('出席番号,氏名\\n1,青葉 湊\\n')"]);

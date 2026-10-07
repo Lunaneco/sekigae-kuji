@@ -37,6 +37,17 @@
     }
     var seats = {};
     Sekigae.makeSeats(rows, columns).forEach(function (seat) { seats[seat.id] = 1; });
+    var gaps = [];
+    if (Array.isArray(data.gaps)) {
+      var seenGap = {};
+      data.gaps.forEach(function (id) {
+        if (typeof id === "string" && /^r\d+c\d+$/.test(id) && seats[id] && !seenGap[id]) {
+          seenGap[id] = 1;
+          gaps.push(id);
+          delete seats[id];
+        }
+      });
+    }
     var assignment = null;
     if (data.assignment && typeof data.assignment === "object") {
       assignment = {};
@@ -45,7 +56,7 @@
       });
     }
     var unseated = Array.isArray(data.unseated) ? data.unseated.filter(function (id) { return known[id]; }) : [];
-    return { students: known, rows: rows, columns: columns, aisle: !!data.aisle, assignment: assignment, unseated: unseated };
+    return { students: known, rows: rows, columns: columns, aisle: !!data.aisle, gaps: gaps, assignment: assignment, unseated: unseated };
   }
 
   function cell(tag, className, text) {
@@ -62,7 +73,7 @@
   }
 
   function render(state) {
-    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: teacher, columns: state.columns });
+    var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: teacher, columns: state.columns, gaps: state.gaps });
     document.title = teacher ? "教員用の座席表" : "掲示用の座席表";
     document.getElementById("caption").textContent = teacher
       ? "教員用。教卓から見て左が左。黒板は前の中央。"
@@ -86,6 +97,10 @@
       line.cells.forEach(function (item) {
         if (item.type === "pad") {
           lineEl.appendChild(cell("span", "pad", ""));
+          return;
+        }
+        if (item.type === "gap") {
+          lineEl.appendChild(cell("span", "pad is-gap", ""));
           return;
         }
         if (item.type === "aisle") {
