@@ -177,18 +177,18 @@ const numbered = [
   { id: "d", number: "3", name: "d" }
 ];
 const fromLeft = S.draw(numbered, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "left" });
-check("左はじから番号順", fromLeft.assignment.r0c0 === "c" && fromLeft.assignment.r0c1 === "a" && fromLeft.assignment.r1c0 === "d" && fromLeft.assignment.r1c1 === "b");
+check("左の列から番号順", fromLeft.assignment.r0c0 === "c" && fromLeft.assignment.r1c0 === "a" && fromLeft.assignment.r0c1 === "d" && fromLeft.assignment.r1c1 === "b");
 const fromRight = S.draw(numbered, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "right" });
-check("右はじから番号順", fromRight.assignment.r0c1 === "c" && fromRight.assignment.r0c0 === "a" && fromRight.assignment.r1c1 === "d" && fromRight.assignment.r1c0 === "b");
+check("右の列から番号順", fromRight.assignment.r0c1 === "c" && fromRight.assignment.r1c1 === "a" && fromRight.assignment.r0c0 === "d" && fromRight.assignment.r1c0 === "b");
 const numberedPin = S.draw(numbered, S.makeSeats([2, 2]), [{ studentId: "a", seatId: "r0c0" }], [], rng(1), { numberOrder: "left" });
-check("番号順でも固定を守る", numberedPin.assignment.r0c0 === "a" && numberedPin.assignment.r0c1 === "c" && numberedPin.assignment.r1c0 === "d" && numberedPin.assignment.r1c1 === "b");
+check("番号順でも固定を守る", numberedPin.assignment.r0c0 === "a" && numberedPin.assignment.r1c0 === "c" && numberedPin.assignment.r0c1 === "d" && numberedPin.assignment.r1c1 === "b");
 const few = [
   { id: "c", number: "1", name: "c" },
   { id: "a", number: "2", name: "a" },
   { id: "d", number: "3", name: "d" }
 ];
 const frontFirst = S.draw(few, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "left" });
-check("空席はうしろに残る", frontFirst.assignment.r0c0 === "c" && frontFirst.assignment.r0c1 === "a" && frontFirst.assignment.r1c0 === "d" && !frontFirst.assignment.r1c1);
+check("余った席は最後の列のうしろ", frontFirst.assignment.r0c0 === "c" && frontFirst.assignment.r1c0 === "a" && frontFirst.assignment.r0c1 === "d" && !frontFirst.assignment.r1c1);
 const colBuilt = S.columnSeats([2, 1]);
 const fromColRight = S.draw(
   [{ id: "a", number: "1", name: "a" }, { id: "b", number: "2", name: "b" }, { id: "c", number: "3", name: "c" }],
@@ -215,7 +215,7 @@ const priority = S.draw(
   S.makeSeats([2, 2]), [], [], rng(3),
   { numberOrder: "left", avoidOpposite: true, neighbors: S.seatNeighbors([2, 2]) }
 );
-check("番号順は性別指定より優先", priority.assignment.r0c0 === "a" && priority.assignment.r0c1 === "b" && priority.assignment.r1c0 === "c" && priority.assignment.r1c1 === "d");
+check("番号順は性別指定より優先", priority.assignment.r0c0 === "a" && priority.assignment.r1c0 === "b" && priority.assignment.r0c1 === "c" && priority.assignment.r1c1 === "d");
 const middleGap = S.buildChartGrid([4], { gaps: ["r0c1"] });
 check("途中の席を抜いても列は動かない", middleGap.lines[0].cells.map((cell) => cell.type).join() === "seat,gap,seat,seat" && middleGap.lines[0].cells[2].col === 2);
 const frontGap = S.buildChartGrid([2, 2], { gaps: ["r0c0"] });
@@ -227,7 +227,10 @@ const skipped = S.draw(
   S.makeSeats([2, 2]).filter((seat) => seat.id !== "r0c0"),
   [], [], rng(1), { numberOrder: "left" }
 );
-check("抜いた前の席を飛ばして番号順", skipped.assignment.r0c1 === "a" && skipped.assignment.r1c0 === "b" && skipped.assignment.r1c1 === "c" && !skipped.assignment.r0c0);
+check("抜いた前の席を飛ばして番号順", skipped.assignment.r1c0 === "a" && skipped.assignment.r0c1 === "b" && skipped.assignment.r1c1 === "c" && !skipped.assignment.r0c0);
+const downColumns = ["a", "b", "c", "d", "e", "f"].map((id, i) => ({ id, number: String(i + 1), name: id }));
+const downLeft = S.draw(downColumns, S.makeSeats([3, 3]), [], [], rng(1), { numberOrder: "left" });
+check("列を前からうしろへ埋める", downLeft.assignment.r0c0 === "a" && downLeft.assignment.r1c0 === "b" && downLeft.assignment.r0c1 === "c" && downLeft.assignment.r1c1 === "d" && downLeft.assignment.r0c2 === "e" && downLeft.assignment.r1c2 === "f");
 const holeFile = X.posterFile({
   caption: "抜き",
   header: "抜き",

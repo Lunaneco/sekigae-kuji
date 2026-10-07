@@ -97,8 +97,8 @@
     if (state.pins.some(function (item) { return item.seatId === seatId; })) return "手直し";
     var seatGroup = groupForSeat(seatId);
     if (seatGroup && !groupIntact(seatGroup)) return "手直し";
-    if (state.filledBy === "left") return "出席番号順（左はじ）";
-    if (state.filledBy === "right") return "出席番号順（右はじ）";
+    if (state.filledBy === "left") return "出席番号順（左の列から）";
+    if (state.filledBy === "right") return "出席番号順（右の列から）";
     return "ランダム";
   }
   function kindOf(how) {
@@ -902,9 +902,9 @@
 
   function resultMessage() {
     var head = state.filledBy === "left"
-      ? "出席番号順に、左はじから席が決まりました。"
+      ? "出席番号順に、左の列から席が決まりました。"
       : state.filledBy === "right"
-        ? "出席番号順に、右はじから席が決まりました。"
+        ? "出席番号順に、右の列から席が決まりました。"
         : "席が決まりました。";
     if (state.filledBy || !state.avoidOpposite || !state.assignment) return head;
     var left = Sekigae.countOpposite(state.students, state.assignment, neighborMap());

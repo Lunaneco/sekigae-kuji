@@ -510,8 +510,8 @@
     function compareSeats(a, b) {
       var pa = seatPos(a);
       var pb = seatPos(b);
-      if (pa.row !== pb.row) return pa.row - pb.row;
-      return numberOrder === "right" ? pb.col - pa.col : pa.col - pb.col;
+      if (pa.col !== pb.col) return numberOrder === "right" ? pb.col - pa.col : pa.col - pb.col;
+      return pa.row - pb.row;
     }
 
     function place() {
