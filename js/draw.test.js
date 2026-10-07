@@ -75,6 +75,24 @@ for (let n = 0; n < 200; n += 1) {
 }
 check("固定と限定抽選を守る", outsiders === 0);
 check("人が席より多い組は拒否", S.validate(students, seats, [], [{ studentIds: ["a", "b", "c"], seatIds: ["r0c0"] }]).length > 0);
+const poolStudents = ["a", "b", "c"].map((id, i) => ({ id, number: String(i + 1), name: "名" + id }));
+const poolSeats = S.makeSeats([3]);
+const poolGroup = [{ studentIds: ["a", "b"], seatIds: ["r0c0", "r0c1", "r0c2"] }];
+const poolSeen = { r0c0: 0, r0c1: 0, r0c2: 0 };
+let poolBad = 0;
+for (let n = 0; n < 80; n += 1) {
+  const drawn = S.draw(poolStudents, poolSeats, [], poolGroup, rng(n + 9));
+  const occupied = Object.keys(drawn.assignment);
+  const empty = ["r0c0", "r0c1", "r0c2"].filter((id) => !drawn.assignment[id]);
+  if (!drawn.ok || occupied.length !== 2 || empty.length !== 1) poolBad += 1;
+  ["a", "b"].forEach((id) => {
+    if (occupied.indexOf(Object.keys(drawn.assignment).find((key) => drawn.assignment[key] === id)) < 0) poolBad += 1;
+  });
+  if (drawn.assignment.r0c0 === "c" || drawn.assignment.r0c1 === "c" || drawn.assignment.r0c2 === "c") poolBad += 1;
+  if (drawn.unseated.indexOf("c") < 0) poolBad += 1;
+  if (empty.length === 1) poolSeen[empty[0]] += 1;
+}
+check("席が多い組は、その席の中だけで空く", poolBad === 0 && poolSeen.r0c0 > 0 && poolSeen.r0c1 > 0 && poolSeen.r0c2 > 0);
 
 const matrix = [["クラス名簿"], ["出席番号", "ふりがな", "氏名"], [1, "あおば", "青葉 湊"], [2, "いぶき", "伊吹 早苗"]];
 const guess = S.guessMapping(matrix);

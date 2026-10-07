@@ -927,10 +927,65 @@
     }
     return Math.max(0, state.rows.length - 1);
   }
-  function showOrder(nodes) {
-    return shuffleNodes([].slice.call(nodes));
+  function showPhases() {
+    var byStudent = {};
+    state.groups.forEach(function (group, index) {
+      group.studentIds.forEach(function (id) {
+        if (byStudent[id] === undefined) byStudent[id] = index;
+      });
+    });
+    var buckets = state.groups.map(function () { return []; });
+    var rest = [];
+    document.querySelectorAll(".seat[data-student]").forEach(function (seat) {
+      var index = byStudent[seat.dataset.student];
+      if (index === undefined) rest.push(seat);
+      else buckets[index].push(seat);
+    });
+    var phases = [];
+    var groupIndex = 0;
+    buckets.forEach(function (list, index) {
+      if (!list.length) return;
+      phases.push({
+        kind: "group",
+        name: state.groups[index].name,
+        seatIds: state.groups[index].seatIds.slice(),
+        groupIndex: groupIndex,
+        seats: shuffleNodes(list)
+      });
+      groupIndex += 1;
+    });
+    if (!phases.length || rest.length) phases.push({ kind: "rest", seats: shuffleNodes(rest) });
+    return phases;
+  }
+  function coverShowSeats() {
+    document.querySelectorAll(".seat[data-student], .seat.is-group").forEach(function (seat) {
+      seat.classList.add("is-secret");
+    });
+  }
+  function unveilEmpty(phase) {
+    var ids = {};
+    (phase.seatIds || []).forEach(function (id) { ids[id] = 1; });
+    var found = false;
+    document.querySelectorAll(".seat.is-group.is-secret").forEach(function (seat) {
+      if (!ids[seat.dataset.seat] || seat.dataset.student) return;
+      seat.classList.remove("is-secret");
+      seat.classList.add("is-slam");
+      found = true;
+    });
+    return found;
   }
   function commentary(kind, index, total) {
+    if (kind === "group-open") return index === 0 ? "この組だけ、先に引きます" : "次の組です";
+    if (kind === "group-name") {
+      var groupLines = ["この人は、どこに座るのでしょう", "名前が出ました。席はまだ秘密です", "席はどれでしょう", "次は誰でしょう", "さあ、どこだ"];
+      return groupLines[index % groupLines.length];
+    }
+    if (kind === "group-place") {
+      var groupPlaces = ["そこです", "その席に決まりました", "決まりました", "その席です"];
+      return groupPlaces[index % groupPlaces.length];
+    }
+    if (kind === "group-empty") return "余った席は、空席です";
+    if (kind === "rest-open") return "ここから、残りの人です";
     if (kind === "open") return "名前が先に出ます。席はそのあとです";
     if (kind === "done") return "全員、決まりました";
     if (kind === "super-place") return "一番うしろ、この席です";
@@ -1012,12 +1067,18 @@
   }
   function runShow() {
     return new Promise(function (resolve) {
-      var seats = showOrder(document.querySelectorAll(".seat[data-student]"));
+      var phases = showPhases();
+      var hadGroup = phases.some(function (phase) { return phase.kind === "group"; });
       var back = backRowIndex();
+      var phaseAt = -1;
       var step = -1;
+      var seats = [];
+      var current = null;
       var timer = 0;
       var flashTimer = 0;
       var closed = false;
+      var total = 0;
+      phases.forEach(function (phase) { total += phase.seats.length; });
       function finish() {
         if (closed) return;
         closed = true;
@@ -1032,25 +1093,14 @@
         document.querySelectorAll(".decide-stamp").forEach(function (el) { el.remove(); });
         resolve();
       }
-      document.getElementById("skipCeremony").onclick = finish;
-      document.body.classList.add("is-reveal");
-      seats.forEach(function (seat) { seat.classList.add("is-secret"); });
-      syncBoard();
-      fitShowChart();
-      document.getElementById("ceremony").hidden = false;
-      startFx();
-      setCopy("席替え", "名前、それから席");
-      setCall(commentary("open", 0, seats.length));
-      thud(78);
-      burstAt(window.innerWidth * 0.5, 92, 90);
-      function next() {
+      function beginPhase() {
         if (closed) return;
-        if (step >= 0 && seats[step]) seats[step].classList.remove("is-calling");
-        step += 1;
-        if (step >= seats.length) {
+        phaseAt += 1;
+        step = -1;
+        if (phaseAt >= phases.length) {
           setBannerSuper(false);
-          setCopy("決定", seats.length ? seats.length + "人" : "");
-          setCall(commentary("done", 0, seats.length));
+          setCopy("決定", total ? total + "人" : "");
+          setCall(commentary("done", 0, total));
           stampDecide();
           burstAt(window.innerWidth * 0.5, window.innerHeight * 0.42, 180);
           thud(64);
@@ -1059,14 +1109,50 @@
           timer = setTimeout(finish, 1100);
           return;
         }
+        current = phases[phaseAt];
+        seats = current.seats;
+        setBannerSuper(false);
+        if (current.kind === "group") {
+          setCopy("限定抽選", (current.name ? current.name + "　" : "") + "この組だけ");
+          setCall(commentary("group-open", current.groupIndex, seats.length));
+        } else {
+          setCopy("席替え", "名前、それから席");
+          setCall(hadGroup ? commentary("rest-open", 0, seats.length) : commentary("open", 0, seats.length));
+          burstAt(window.innerWidth * 0.5, 92, 90);
+        }
+        thud(78);
+        timer = setTimeout(next, 780);
+      }
+      document.getElementById("skipCeremony").onclick = finish;
+      document.body.classList.add("is-reveal");
+      coverShowSeats();
+      syncBoard();
+      fitShowChart();
+      document.getElementById("ceremony").hidden = false;
+      startFx();
+      function next() {
+        if (closed) return;
+        if (step >= 0 && seats[step]) seats[step].classList.remove("is-calling");
+        step += 1;
+        if (step >= seats.length) {
+          if (current && current.kind === "group" && unveilEmpty(current)) {
+            setBannerSuper(false);
+            setCall(commentary("group-empty", 0, seats.length));
+            timer = setTimeout(beginPhase, 700);
+            return;
+          }
+          beginPhase();
+          return;
+        }
         var seat = seats[step];
-        var backSeat = seatPos(seat).row === back;
-        var last = step === seats.length - 1;
+        var main = !current || current.kind === "rest";
+        var backSeat = main && seatPos(seat).row === back;
+        var last = main && step === seats.length - 1;
         var pace = showPace(step, seats.length);
         var count = (step + 1) + " / " + seats.length;
         setBannerSuper(false);
         setCopy(seatLabel(seat), (last ? "最後の一人　" : "") + count);
-        setCall(commentary("name", step, seats.length));
+        setCall(commentary(main ? "name" : "group-name", step, seats.length));
         charge();
         timer = setTimeout(function () {
           if (closed) return;
@@ -1080,7 +1166,7 @@
             chargeSuper();
           }
           setCopy(seatLabel(seat), (backSeat ? "一番うしろ　" : "") + seatPlace(seat) + "　" + count);
-          setCall(commentary(backSeat ? "super-place" : "place", step, seats.length));
+          setCall(commentary(backSeat ? "super-place" : (main ? "place" : "group-place"), step, seats.length));
           timer = setTimeout(function () {
             if (closed) return;
             seat.classList.remove("is-secret", "is-calling");
@@ -1101,7 +1187,7 @@
           }, backSeat ? 460 : 180);
         }, pace.name);
       }
-      timer = setTimeout(next, 780);
+      beginPhase();
     });
   }
   function stampDecide() {
