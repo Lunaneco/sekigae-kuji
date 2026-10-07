@@ -288,5 +288,18 @@ const before = Object.keys(Object.prototype).length;
 XLSX.read(fs.readFileSync("/tmp/sekigae-poster.xlsx"), { type: "array", cellFormula: false, cellHTML: false, bookVBA: false });
 check("読み込みで原型を汚さない", Object.keys(Object.prototype).length === before);
 
+const colNorm = S.normalizeLayout([2, 1], [2, 1]);
+check("列指定はうしろの空きになる", colNorm.rows.join() === "2,2" && colNorm.gaps.join() === "r1c1" && colNorm.mapId("r1c0") === "r1c0" && colNorm.mapId("r0c1") === "r0c1");
+const keptCol = S.normalizeLayout([4, 2], [1, 2, 2, 1]);
+check("長い列の席番号は動かさない", keptCol.rows.join() === "4,4" && keptCol.gaps.slice().sort().join() === "r1c0,r1c3" && keptCol.mapId("r1c1") === "r1c1" && keptCol.mapId("r1c2") === "r1c2");
+const rowNorm = S.normalizeLayout([4, 2], null);
+check("短い行は両端の空きになる", rowNorm.rows.join() === "4,4" && rowNorm.gaps.slice().sort().join() === "r1c0,r1c3" && rowNorm.mapId("r1c0") === "r1c1" && rowNorm.mapId("r1c1") === "r1c2");
+const evenNorm = S.normalizeLayout([6, 6, 6, 6], null);
+check("揃った行列はそのまま", evenNorm.rows.join() === "6,6,6,6" && evenNorm.gaps.length === 0 && evenNorm.mapId("r2c3") === "r2c3");
+const adopted = S.adoptLayout([4, 2], null, ["r1c0"]);
+check("抜いた席は中央寄せのあとへ移す", adopted.rows.join() === "4,4" && adopted.gaps.slice().sort().join() === "r1c0,r1c1,r1c3" && adopted.mapId("r1c1") === "r1c2" && !adopted.seats.r1c1 && adopted.seats.r1c2 === 1);
+const adoptedCol = S.adoptLayout([2, 1], [2, 1], ["r0c0"]);
+check("列の抜いた席とうしろの空きを合わせる", adoptedCol.gaps.slice().sort().join() === "r0c0,r1c1" && adoptedCol.mapId("r1c0") === "r1c0" && adoptedCol.seats.r1c0 === 1);
+
 if (failed) { console.error(failed + " failed"); process.exit(1); }
 console.log("all passed");

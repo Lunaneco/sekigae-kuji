@@ -208,6 +208,73 @@
     return seats;
   }
 
+  function normalizeLayout(rows, columns) {
+    function identity(id) { return String(id); }
+    var built = columns && columns.length ? columnSeats(columns) : null;
+    if (built && built.ok) {
+      var width = built.columns.length;
+      var depth = 0;
+      var i;
+      for (i = 0; i < width; i += 1) if (built.columns[i] > depth) depth = built.columns[i];
+      var rectangular = [];
+      var back = [];
+      for (i = 0; i < depth; i += 1) rectangular.push(width);
+      var r;
+      var c;
+      for (c = 0; c < width; c += 1) {
+        for (r = built.columns[c]; r < depth; r += 1) back.push("r" + r + "c" + c);
+      }
+      return { rows: rectangular, gaps: back, mapId: identity };
+    }
+    var counts = [];
+    var n;
+    var source = Array.isArray(rows) ? rows : [];
+    for (n = 0; n < source.length; n += 1) counts.push(source[n] | 0);
+    var width = 0;
+    for (n = 0; n < counts.length; n += 1) if (counts[n] > width) width = counts[n];
+    var even = counts.length > 0 && counts.every(function (count) { return count === counts[0]; });
+    if (even || width < 1) return { rows: counts, gaps: [], mapId: identity };
+    var full = [];
+    var holes = [];
+    for (n = 0; n < counts.length; n += 1) full.push(width);
+    for (r = 0; r < counts.length; r += 1) {
+      var count = counts[r];
+      if (count < 0) count = 0;
+      var pad = Math.floor((width - count) / 2);
+      for (c = 0; c < width; c += 1) {
+        if (c < pad || c >= pad + count) holes.push("r" + r + "c" + c);
+      }
+    }
+    function mapId(id) {
+      var found = /^r(\d+)c(\d+)$/.exec(String(id));
+      if (!found) return String(id);
+      var row = parseInt(found[1], 10);
+      var col = parseInt(found[2], 10);
+      if (row < 0 || row >= counts.length) return String(id);
+      var seatsInRow = counts[row];
+      if (seatsInRow < 0) seatsInRow = 0;
+      return "r" + row + "c" + (col + Math.floor((width - seatsInRow) / 2));
+    }
+    return { rows: full, gaps: holes, mapId: mapId };
+  }
+
+  function adoptLayout(rows, columns, savedGaps) {
+    var layout = normalizeLayout(rows, columns);
+    var seats = {};
+    makeSeats(layout.rows, null).forEach(function (seat) { seats[seat.id] = 1; });
+    var gaps = [];
+    var seen = {};
+    function take(id) {
+      if (typeof id !== "string" || !/^r\d+c\d+$/.test(id) || !seats[id] || seen[id]) return;
+      seen[id] = 1;
+      gaps.push(id);
+      delete seats[id];
+    }
+    layout.gaps.forEach(take);
+    if (Array.isArray(savedGaps)) savedGaps.forEach(function (id) { take(layout.mapId(id)); });
+    return { rows: layout.rows, gaps: gaps, mapId: layout.mapId, seats: seats };
+  }
+
   function shuffle(items, rng) {
     var list = items.slice();
     var i;
@@ -781,6 +848,8 @@
     distributeSeats: distributeSeats,
     gridSeats: gridSeats,
     columnSeats: columnSeats,
+    normalizeLayout: normalizeLayout,
+    adoptLayout: adoptLayout,
     makeSeats: makeSeats,
     buildChartGrid: buildChartGrid,
     shuffle: shuffle,

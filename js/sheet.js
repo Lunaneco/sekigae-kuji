@@ -26,37 +26,21 @@
       };
       students.push(known[id]);
     });
-    var columns = null;
-    var rows = data.rows.slice();
-    if (Array.isArray(data.columns) && data.columns.length) {
-      var built = Sekigae.columnSeats(data.columns);
-      if (built.ok) {
-        columns = built.columns;
-        rows = built.rows;
-      }
-    }
-    var seats = {};
-    Sekigae.makeSeats(rows, columns).forEach(function (seat) { seats[seat.id] = 1; });
-    var gaps = [];
-    if (Array.isArray(data.gaps)) {
-      var seenGap = {};
-      data.gaps.forEach(function (id) {
-        if (typeof id === "string" && /^r\d+c\d+$/.test(id) && seats[id] && !seenGap[id]) {
-          seenGap[id] = 1;
-          gaps.push(id);
-          delete seats[id];
-        }
-      });
-    }
+    var columnsIn = Array.isArray(data.columns) && data.columns.length ? data.columns : null;
+    var adopted = Sekigae.adoptLayout(data.rows.slice(), columnsIn, data.gaps);
+    var rows = adopted.rows;
+    var gaps = adopted.gaps;
+    var seats = adopted.seats;
     var assignment = null;
     if (data.assignment && typeof data.assignment === "object") {
       assignment = {};
       Object.keys(data.assignment).forEach(function (seatId) {
-        if (seats[seatId] && known[data.assignment[seatId]]) assignment[seatId] = data.assignment[seatId];
+        var nextId = adopted.mapId(seatId);
+        if (seats[nextId] && known[data.assignment[seatId]]) assignment[nextId] = data.assignment[seatId];
       });
     }
     var unseated = Array.isArray(data.unseated) ? data.unseated.filter(function (id) { return known[id]; }) : [];
-    return { students: known, rows: rows, columns: columns, aisle: !!data.aisle, gaps: gaps, assignment: assignment, unseated: unseated };
+    return { students: known, rows: rows, columns: null, aisle: !!data.aisle, gaps: gaps, assignment: assignment, unseated: unseated };
   }
 
   function cell(tag, className, text) {

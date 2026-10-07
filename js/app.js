@@ -130,30 +130,18 @@
       });
     }
     if (Array.isArray(data.rows) && data.rows.length <= 20 && data.rows.every(function (n) { return typeof n === "number" && n >= 0 && n <= 20; })) next.rows = data.rows.slice();
-    if (Array.isArray(data.columns) && data.columns.length) {
-      var built = Sekigae.columnSeats(data.columns);
-      if (built.ok) {
-        next.columns = built.columns;
-        next.rows = built.rows;
-      }
-    }
+    var columnsIn = Array.isArray(data.columns) && data.columns.length ? data.columns : null;
+    var adopted = Sekigae.adoptLayout(next.rows, columnsIn, data.gaps);
+    next.rows = adopted.rows;
+    next.columns = null;
+    next.gaps = adopted.gaps;
     var knownS = {};
     next.students.forEach(function (s) { knownS[s.id] = 1; });
-    var knownSeat = {};
-    Sekigae.makeSeats(next.rows, next.columns).forEach(function (seat) { knownSeat[seat.id] = 1; });
-    if (Array.isArray(data.gaps)) {
-      var seenGap = {};
-      data.gaps.forEach(function (id) {
-        if (typeof id === "string" && /^r\d+c\d+$/.test(id) && knownSeat[id] && !seenGap[id]) {
-          seenGap[id] = 1;
-          next.gaps.push(id);
-          delete knownSeat[id];
-        }
-      });
-    }
+    var knownSeat = adopted.seats;
     if (Array.isArray(data.pins)) {
       data.pins.forEach(function (pin) {
-        if (knownS[pin.studentId] && knownSeat[pin.seatId]) next.pins.push({ studentId: pin.studentId, seatId: pin.seatId });
+        var seatId = adopted.mapId(pin.seatId);
+        if (knownS[pin.studentId] && knownSeat[seatId]) next.pins.push({ studentId: pin.studentId, seatId: seatId });
       });
     }
     if (Array.isArray(data.groups)) {
@@ -161,7 +149,14 @@
         var id = cleanId(group.id, "g");
         if (!id) return;
         var people = (group.studentIds || []).filter(function (sid) { return knownS[sid]; });
-        var seats = (group.seatIds || []).filter(function (sid) { return knownSeat[sid]; });
+        var seats = [];
+        var seenSeat = {};
+        (group.seatIds || []).forEach(function (sid) {
+          var nextId = adopted.mapId(sid);
+          if (!knownSeat[nextId] || seenSeat[nextId]) return;
+          seenSeat[nextId] = 1;
+          seats.push(nextId);
+        });
         if (!people.length || !seats.length || people.length > seats.length) return;
         next.groups.push({ id: id, name: String(group.name || "").slice(0, 24), studentIds: people, seatIds: seats, color: group.color || COLORS[0] });
         maxId = Math.max(maxId, parseInt(id.slice(1), 10) || 0);
@@ -170,7 +165,8 @@
     if (data.assignment && typeof data.assignment === "object") {
       next.assignment = {};
       Object.keys(data.assignment).forEach(function (seatId) {
-        if (knownSeat[seatId] && knownS[data.assignment[seatId]]) next.assignment[seatId] = data.assignment[seatId];
+        var nextId = adopted.mapId(seatId);
+        if (knownSeat[nextId] && knownS[data.assignment[seatId]]) next.assignment[nextId] = data.assignment[seatId];
       });
     }
     next.unseated = Array.isArray(data.unseated) ? data.unseated.filter(function (id) { return knownS[id]; }) : [];
@@ -194,9 +190,9 @@
     toastTimer = setTimeout(function () { el.hidden = true; }, 4200);
   }
 
-  function describe(rows, columns) {
-    var total = rows.reduce(function (sum, n) { return sum + n; }, 0);
-    if (columns && columns.length) return "列ごとの席数 " + columns.join("・") + "（合計" + total + "席）";
+  function describe(rows, holes) {
+    var total = rows.reduce(function (sum, n) { return sum + n; }, 0) - (holes || 0);
+    if (total < 0) total = 0;
     var even = rows.length > 0 && rows.every(function (n) { return n === rows[0]; });
     if (even) return rows.length + "行 × " + rows[0] + "列（合計" + total + "席）";
     return "合計" + total + "席 / " + rows.length + "行";
@@ -213,7 +209,7 @@
 
   function renderStatus() {
     var report = problems();
-    var bits = ["名簿 " + state.students.length + "人", describe(state.rows, state.columns)];
+    var bits = ["名簿 " + state.students.length + "人", describe(state.rows, state.gaps.length)];
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
     if (state.gaps.length) bits.push("抜き " + state.gaps.length + "席");
@@ -237,8 +233,7 @@
     document.getElementById("numberFromLabel").hidden = !numberOrder;
     document.getElementById("numberHint").hidden = !numberOrder;
     document.getElementById("pinMode").setAttribute("aria-pressed", state.mode === "pin" ? "true" : "false");
-    document.getElementById("gapMode").setAttribute("aria-pressed", state.mode === "gap" ? "true" : "false");
-    document.getElementById("gapHint").hidden = state.mode !== "gap";
+    document.getElementById("gapHint").hidden = document.getElementById("layoutMode").value !== "chart";
     document.getElementById("swapMode").setAttribute("aria-pressed", state.mode === "swap" ? "true" : "false");
     document.getElementById("btnSound").setAttribute("aria-pressed", state.sound ? "true" : "false");
     document.getElementById("btnSound").textContent = state.sound ? "音あり" : "音なし";
@@ -354,7 +349,7 @@
           hole.className = "pad is-gap";
           hole.dataset.seat = "r" + line.row + "c" + cell.col;
           hole.textContent = state.mode === "gap" ? "戻す" : "";
-          hole.title = "抜いた席。席を抜くをもう一度押してから戻します。";
+          hole.title = "抜いた席。座席表指定でもう一度クリックすると戻ります。";
           lineEl.appendChild(hole);
           return;
         }
@@ -481,119 +476,31 @@
     });
   }
 
-  function renderCustomRows(counts) {
-    var box = document.getElementById("customRows");
-    box.textContent = "";
-    counts.forEach(function (count, index) {
-      var line = document.createElement("div");
-      line.className = "row-edit";
-      var label = document.createElement("span");
-      label.textContent = index + 1 + "行目（前から）";
-      var input = document.createElement("input");
-      input.className = "row-count";
-      input.type = "number";
-      input.min = "0";
-      input.max = "20";
-      input.value = String(count);
-      var button = document.createElement("button");
-      button.type = "button";
-      button.dataset.removeRow = String(index);
-      button.textContent = "外す";
-      input.addEventListener("input", updateLayoutPreview);
-      line.append(label, input, button);
-      box.appendChild(line);
-    });
-  }
-
-  function readCustom() {
-    return [].map.call(document.querySelectorAll("#customRows .row-count"), function (input) {
-      return clampInt(input.value, 0, 20);
-    });
-  }
-  function columnsFromRows(rows) {
-    var width = 0;
-    rows.forEach(function (n) { if (n > width) width = n; });
-    if (!width) return [4];
-    if (rows.every(function (n) { return n === rows[0]; })) {
-      var even = [];
-      var i;
-      for (i = 0; i < rows[0]; i += 1) even.push(rows.length);
-      return even;
-    }
-    var depths = [];
-    var c;
-    for (c = 0; c < width; c += 1) depths.push(0);
-    rows.forEach(function (count, row) {
-      var pad = Math.floor((width - count) / 2);
-      var i;
-      for (i = 0; i < count; i += 1) depths[pad + i] = row + 1;
-    });
-    return depths.filter(function (n) { return n > 0; });
-  }
-  function renderCustomCols(depths) {
-    var box = document.getElementById("customCols");
-    box.textContent = "";
-    depths.forEach(function (count, index) {
-      var line = document.createElement("div");
-      line.className = "row-edit";
-      var label = document.createElement("span");
-      label.textContent = index + 1 + "列目（左から）";
-      var input = document.createElement("input");
-      input.className = "col-count";
-      input.type = "number";
-      input.min = "1";
-      input.max = "20";
-      input.value = String(count);
-      input.setAttribute("aria-label", index + 1 + "列目の席数");
-      var button = document.createElement("button");
-      button.type = "button";
-      button.dataset.removeCol = String(index);
-      button.textContent = "外す";
-      input.addEventListener("input", updateLayoutPreview);
-      line.append(label, input, button);
-      box.appendChild(line);
-    });
-  }
-  function readCols() {
-    return [].map.call(document.querySelectorAll("#customCols .col-count"), function (input) {
-      return clampInt(input.value, 1, 20);
-    });
-  }
   function proposedRows() {
-    var mode = document.getElementById("layoutMode").value;
-    if (mode === "grid") {
-      return Sekigae.gridSeats(
-        clampInt(document.getElementById("gridRows").value, 1, 20),
-        clampInt(document.getElementById("gridCols").value, 1, 20)
-      );
-    }
-    if (mode === "total") {
-      return Sekigae.distributeSeats(
-        clampInt(document.getElementById("totalSeats").value, 1, 400),
-        clampInt(document.getElementById("rowCount").value, 1, 20)
-      );
-    }
-    if (mode === "cols") {
-      var depths = readCols();
-      var built = Sekigae.columnSeats(depths);
-      return built.ok ? built : { ok: false, error: built.error, rows: [], columns: [] };
-    }
-    var rows = readCustom();
-    if (!rows.length || rows.every(function (n) { return n === 0; })) return { ok: false, error: "座席がありません。", rows: [] };
-    return { ok: true, error: "", rows: rows, columns: null };
+    return Sekigae.gridSeats(
+      clampInt(document.getElementById("gridRows").value, 1, 20),
+      clampInt(document.getElementById("gridCols").value, 1, 20)
+    );
   }
   function updateLayoutPreview() {
     var next = proposedRows();
     document.getElementById("layoutPreview").textContent = next.ok
-      ? "いま " + describe(state.rows, state.columns) + "。指定すると " + describe(next.rows, next.columns) + "。黒板は前の中央に揃います。"
+      ? "いま " + describe(state.rows, state.gaps.length) + "。指定すると " + describe(next.rows, 0) + "。"
       : next.error;
   }
   function syncLayoutPanels() {
-    var mode = document.getElementById("layoutMode").value;
-    document.getElementById("gridBox").hidden = mode !== "grid";
-    document.getElementById("totalBox").hidden = mode !== "total";
-    document.getElementById("customBox").hidden = mode !== "rows";
-    document.getElementById("colBox").hidden = mode !== "cols";
+    var chart = document.getElementById("layoutMode").value === "chart";
+    document.getElementById("gridBox").hidden = chart;
+    document.getElementById("applyLayout").hidden = chart;
+    document.getElementById("layoutPreview").hidden = chart;
+    document.getElementById("gapHint").hidden = !chart;
+  }
+  function exitChart() {
+    var select = document.getElementById("layoutMode");
+    if (!select || select.value !== "chart") return;
+    select.value = "grid";
+    if (state.mode === "gap") state.mode = "view";
+    syncLayoutPanels();
   }
 
   function onPersonEdit(id, field, value) {
@@ -653,17 +560,15 @@
     var next = proposedRows();
     if (!next.ok) { flash(next.error); return; }
     var known = {};
-    Sekigae.makeSeats(next.rows, next.columns).forEach(function (seat) { known[seat.id] = 1; });
+    Sekigae.makeSeats(next.rows, null).forEach(function (seat) { known[seat.id] = 1; });
     var lost = state.pins.some(function (pin) { return !known[pin.seatId]; }) || state.groups.some(function (group) {
       return group.seatIds.some(function (id) { return !known[id]; });
     });
-    if (lost && !window.confirm("座席を変えると、はみ出す固定席と限定抽選を外します。")) return;
+    if ((state.gaps.length || lost) && !window.confirm("行と列で座席を作り直します。抜いた席と、はみ出す指定は外れます。")) return;
     state.rows = next.rows;
-    state.columns = next.columns || null;
-    state.gaps = state.gaps.filter(function (id) { return known[id]; });
+    state.columns = null;
+    state.gaps = [];
     pruneToSeats();
-    renderCustomRows(state.rows.slice());
-    renderCustomCols(state.columns || columnsFromRows(state.rows));
     refresh();
   }
 
@@ -688,6 +593,7 @@
       state.filledBy = "";
       state.draft = null;
       state.mode = "view";
+      exitChart();
     }
     people.slice(0, 500 - state.students.length).forEach(function (person) {
       if (!person.name) return;
@@ -1304,54 +1210,35 @@
     document.getElementById("unseated").addEventListener("click", function (event) {
       var button = event.target.closest("[data-unseated]");
       if (!button || !state.assignment) return;
+      exitChart();
       state.mode = "swap";
       state.swapFrom = { type: "person", id: button.dataset.unseated };
       renderRoom();
       renderStatus();
     });
     document.getElementById("layoutMode").addEventListener("change", function () {
-      syncLayoutPanels();
-      if (document.getElementById("layoutMode").value === "rows") renderCustomRows(state.rows.slice());
-      if (document.getElementById("layoutMode").value === "cols" && !readCols().length) {
-        renderCustomCols(state.columns || columnsFromRows(state.rows));
+      var chart = document.getElementById("layoutMode").value === "chart";
+      if (chart) {
+        if (state.draft && (state.draft.studentIds.length || state.draft.seatIds.length)) {
+          flash("作りかけの限定抽選を先に確定してください。");
+          document.getElementById("layoutMode").value = "grid";
+          syncLayoutPanels();
+          return;
+        }
+        state.draft = null;
+        state.swapFrom = null;
+        state.mode = "gap";
+      } else if (state.mode === "gap") {
+        state.mode = "view";
       }
+      syncLayoutPanels();
       updateLayoutPreview();
+      renderRoom();
+      renderStatus();
+      save();
     });
-    ["gridRows", "gridCols", "totalSeats", "rowCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
+    ["gridRows", "gridCols"].forEach(function (id) { document.getElementById(id).addEventListener("input", updateLayoutPreview); });
     document.getElementById("applyLayout").addEventListener("click", applyLayout);
-    document.getElementById("addRow").addEventListener("click", function () {
-      var rows = readCustom();
-      if (rows.length >= 20) return;
-      rows.push(6);
-      renderCustomRows(rows);
-      updateLayoutPreview();
-    });
-    document.getElementById("addCol").addEventListener("click", function () {
-      var depths = readCols();
-      if (!depths.length) depths = columnsFromRows(state.rows);
-      if (depths.length >= 20) return;
-      depths.push(depths[depths.length - 1] || 4);
-      renderCustomCols(depths);
-      updateLayoutPreview();
-    });
-    document.getElementById("customCols").addEventListener("click", function (event) {
-      var button = event.target.closest("[data-remove-col]");
-      if (!button) return;
-      var depths = readCols();
-      depths.splice(Number(button.dataset.removeCol), 1);
-      if (!depths.length) depths = [4];
-      renderCustomCols(depths);
-      updateLayoutPreview();
-    });
-    document.getElementById("customRows").addEventListener("click", function (event) {
-      var button = event.target.closest("[data-remove-row]");
-      if (!button) return;
-      var rows = readCustom();
-      rows.splice(Number(button.dataset.removeRow), 1);
-      if (!rows.length) rows = [6];
-      renderCustomRows(rows);
-      updateLayoutPreview();
-    });
     document.getElementById("aisle").addEventListener("change", function (event) {
       state.aisle = event.target.checked;
       renderRoom();
@@ -1359,16 +1246,10 @@
     });
     document.getElementById("viewPoster").addEventListener("click", function () { state.teacherView = false; renderRoom(); renderStatus(); save(); });
     document.getElementById("viewTeacher").addEventListener("click", function () { state.teacherView = true; renderRoom(); renderStatus(); save(); });
-    document.getElementById("gapMode").addEventListener("click", function () {
-      if (state.draft && (state.draft.studentIds.length || state.draft.seatIds.length)) { flash("作りかけの限定抽選を先に確定してください。"); return; }
-      state.draft = null;
-      state.mode = state.mode === "gap" ? "view" : "gap";
-      renderStatus();
-      renderRoom();
-    });
     document.getElementById("pinMode").addEventListener("click", function () {
       if (state.draft && (state.draft.studentIds.length || state.draft.seatIds.length)) { flash("作りかけの限定抽選を先に確定してください。"); return; }
       state.draft = null;
+      exitChart();
       state.mode = state.mode === "pin" ? "view" : "pin";
       renderStatus();
       renderRoom();
@@ -1383,6 +1264,7 @@
       save();
     });
     document.getElementById("newGroup").addEventListener("click", function () {
+      exitChart();
       state.mode = "group";
       state.draft = { studentIds: [], seatIds: [] };
       document.getElementById("draftName").value = "";
@@ -1393,6 +1275,7 @@
     });
     document.getElementById("draftCancel").addEventListener("click", function () {
       state.draft = null;
+      exitChart();
       state.mode = "view";
       refresh();
     });
@@ -1407,6 +1290,7 @@
         color: COLORS[state.groups.length % COLORS.length]
       });
       state.draft = null;
+      exitChart();
       state.mode = "view";
       refresh();
     });
@@ -1422,6 +1306,7 @@
     });
     document.getElementById("swapMode").addEventListener("click", function () {
       if (!state.assignment) { flash("先に席替えをしてください。"); return; }
+      exitChart();
       state.mode = state.mode === "swap" ? "view" : "swap";
       state.swapFrom = null;
       renderRoom();
@@ -1477,11 +1362,8 @@
       document.getElementById("mapping").hidden = true;
       document.getElementById("gridRows").value = "4";
       document.getElementById("gridCols").value = "6";
-      document.getElementById("totalSeats").value = "24";
-      document.getElementById("rowCount").value = "4";
       document.getElementById("layoutMode").value = "grid";
       syncLayoutPanels();
-      renderCustomRows(state.rows.slice());
       refresh();
     });
     document.addEventListener("keydown", function (event) {
@@ -1491,14 +1373,9 @@
 
   load();
   bind();
-  document.getElementById("gridRows").value = String(state.rows.length);
+  document.getElementById("gridRows").value = String(state.rows.length || 4);
   document.getElementById("gridCols").value = String(state.rows[0] || 6);
-  document.getElementById("totalSeats").value = String(state.rows.reduce(function (sum, n) { return sum + n; }, 0));
-  document.getElementById("rowCount").value = String(state.rows.length);
-  var even = state.rows.length > 0 && state.rows.every(function (n) { return n === state.rows[0]; });
-  document.getElementById("layoutMode").value = state.columns && state.columns.length ? "cols" : (even ? "grid" : "rows");
+  document.getElementById("layoutMode").value = "grid";
   syncLayoutPanels();
-  renderCustomRows(state.rows.slice());
-  renderCustomCols(state.columns || columnsFromRows(state.rows));
   refresh();
 })();
