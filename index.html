@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>席替えくじ</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <header class="top">
+    <img class="brand" src="assets/lottery-box.jpg" alt="">
+    <div>
+      <p class="eyebrow">教室の席替え</p>
+      <h1>席替えくじ</h1>
+      <p class="lede">名簿の番号と名前を読み、席をランダムに決めます。指定した人は、指定した席だけで引きます。</p>
+    </div>
+    <div class="top-actions">
+      <button type="button" id="btnSample">サンプル名簿</button>
+      <button type="button" id="btnTemplate">名簿のひな形</button>
+      <button type="button" id="btnSound" aria-pressed="true">音あり</button>
+      <button type="button" id="btnReset">最初から</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="panel" aria-labelledby="rosterHeading">
+      <h2 id="rosterHeading">名簿</h2>
+      <p class="hint">ExcelかCSVを読みます。番号と名前は、この端末の中だけで扱います。</p>
+      <div id="drop" class="drop">
+        <p>ここにドロップ</p>
+        <label class="file-btn">名簿を選ぶ
+          <input id="file" type="file" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+        </label>
+      </div>
+      <div id="mapping" class="mapping" hidden>
+        <label>シート <select id="sheet"></select></label>
+        <label>番号の列 <select id="colNumber"></select></label>
+        <label>名前の列 <select id="colName"></select></label>
+        <label>見出し <select id="headerRow"></select></label>
+        <div id="preview"></div>
+        <div class="row-actions">
+          <button type="button" id="importReplace">この名簿に入れ替える</button>
+          <button type="button" id="importAppend">名簿に足す</button>
+          <button type="button" id="importCancel">やめる</button>
+        </div>
+      </div>
+      <div class="roster-tools">
+        <input id="rosterFilter" type="search" placeholder="番号・名前で絞る" autocomplete="off">
+        <button type="button" id="btnSort">番号順</button>
+      </div>
+      <ul id="roster" class="roster"></ul>
+      <form id="addForm" class="add-form" autocomplete="off">
+        <input id="addNumber" maxlength="20" placeholder="番号" aria-label="番号">
+        <input id="addName" maxlength="80" placeholder="名前" aria-label="名前" required>
+        <button type="submit">追加</button>
+      </form>
+    </section>
+
+    <section class="panel room-panel" aria-labelledby="roomHeading">
+      <h2 id="roomHeading">座席</h2>
+      <div class="layout">
+        <label>作り方
+          <select id="layoutMode">
+            <option value="total">座席数から作る</option>
+            <option value="rows">列ごとに席数を指定</option>
+          </select>
+        </label>
+        <div id="totalBox" class="layout-fields">
+          <label>座席数 <input id="totalSeats" type="number" min="1" max="400" value="24"></label>
+          <label>列の数 <input id="rowCount" type="number" min="1" max="20" value="4"></label>
+        </div>
+        <div id="customBox" hidden>
+          <div id="customRows"></div>
+          <button type="button" id="addRow">列を足す</button>
+        </div>
+        <button type="button" id="applyLayout" class="solid">この座席にする</button>
+        <p id="layoutPreview" class="hint"></p>
+        <label class="check"><input id="aisle" type="checkbox"> 中央に通路を空ける</label>
+        <div class="view-switch" role="group" aria-label="座席の見方">
+          <button type="button" id="viewPoster" aria-pressed="true">掲示用</button>
+          <button type="button" id="viewTeacher" aria-pressed="false">教員用</button>
+        </div>
+        <p class="hint">黒板は前の中央です。掲示用は向かって左が左、教員用は教卓から見た左が左です。</p>
+      </div>
+      <div id="room" class="room"></div>
+      <div id="unseated" class="unseated"></div>
+      <div class="row-actions">
+        <button type="button" id="swapMode" aria-pressed="false">結果を入れ替える</button>
+        <button type="button" id="btnUndo">直前に戻す</button>
+        <button type="button" id="btnClearResult">結果を消す</button>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="ruleHeading">
+      <h2 id="ruleHeading">指定してから引く</h2>
+      <section>
+        <h3>固定席</h3>
+        <p class="hint">この人だけ、この席に決めます。くじでは動きません。</p>
+        <label>固定する人 <select id="pinStudent"></select></label>
+        <button type="button" id="pinMode" aria-pressed="false">席をクリックして固定</button>
+        <ul id="pinList" class="rule-list"></ul>
+      </section>
+      <section>
+        <h3>限定抽選</h3>
+        <p class="hint">選んだ人は、選んだ席の中だけでくじを引きます。その席に他の人は座りません。</p>
+        <button type="button" id="newGroup">組を作る</button>
+        <div id="draftBox" class="draft" hidden>
+          <label>組の名前 <input id="draftName" maxlength="24" placeholder="例: 最前列" autocomplete="off"></label>
+          <p id="draftCount" class="hint"></p>
+          <p class="hint">名簿の人をクリックし、教室の席をクリックします。</p>
+          <div class="row-actions">
+            <button type="button" id="draftSave">この組で抽選する</button>
+            <button type="button" id="draftCancel">やめる</button>
+          </div>
+        </div>
+        <ul id="groupList" class="rule-list"></ul>
+      </section>
+      <details class="help">
+        <summary>使い方</summary>
+        <ol>
+          <li>名簿を読み、番号と名前の列を確認します。</li>
+          <li>座席数か、列ごとの席数を決めます。短い列は黒板の中央に揃います。</li>
+          <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。</li>
+          <li>席替えすると演出のあと席が決まります。掲示用と教員用のExcelを保存できます。</li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <div class="drawbar">
+    <p id="status" class="status" role="status"></p>
+    <div class="draw-actions">
+      <button type="button" id="btnDraw" class="draw">席替えする</button>
+      <button type="button" id="btnQuiet">結果だけ出す</button>
+      <button type="button" id="btnPoster">掲示用Excel</button>
+      <button type="button" id="btnTeacher">教員用Excel</button>
+      <button type="button" id="btnBoth">両方保存</button>
+      <button type="button" id="btnPrint">印刷</button>
+    </div>
+  </div>
+  <p id="toast" class="toast" hidden></p>
+  <p id="live" class="sr-only" aria-live="polite"></p>
+
+  <div id="ceremony" class="ceremony" hidden>
+    <img class="ceremony-still start" src="assets/ceremony-start.jpg" alt="">
+    <img class="ceremony-still end" src="assets/ceremony-end.jpg" alt="">
+    <video id="ceremonyVideo" src="assets/ceremony.mp4" poster="assets/ceremony-start.jpg" playsinline preload="auto"></video>
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="ceremony-copy">
+      <p>くじ</p>
+      <h2 class="ceremony-title">席替え</h2>
+    </div>
+    <button type="button" id="skipCeremony">演出をスキップ</button>
+  </div>
+  <div id="flash" class="flash" aria-hidden="true"></div>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/xlsx-write.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
