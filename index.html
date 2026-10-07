@@ -127,7 +127,7 @@
           <li>名簿を読み、番号、名前、性別の列を確認します。性別の列はなくても引きます。</li>
           <li>行列指定で、前からの行の数と左からの列の数を決めます。座席表指定では、席をクリックして、その位置を空けたまま外せます。アプリでは×と出ます。掲示とExcelでは、その席は無いように出ます。×をもう一度クリックすると戻ります。隣の席は詰めません。</li>
           <li>動かさない人は固定席、一部の席だけで引きたい人は限定抽選にします。「周りが異性だけにならない」にすると、上下左右が異性だけになる席を避けます。通路の向こうは隣になりません。</li>
-          <li>席替えすると演出のあと席が決まります。決め方で出席番号順を選ぶと、前の行から左はじ、または右はじへ番号順に座ります。左はじは黒板に向かって左です。</li>
+          <li>席替えすると、座席表を画面いっぱいに出して、一人ずつ席を決めます。決め方で出席番号順を選ぶと、前の行から左はじ、または右はじへ番号順に座ります。左はじは黒板に向かって左です。</li>
           <li>掲示用と教員用は、ブラウザのページとして開きます。Excelでも保存できます。</li>
         </ol>
       </details>
@@ -167,13 +167,10 @@
   <p id="live" class="sr-only" aria-live="polite"></p>
 
   <div id="ceremony" class="ceremony" hidden>
-    <img class="ceremony-still start" src="assets/ceremony-start.jpg" alt="">
-    <img class="ceremony-still end" src="assets/ceremony-end.jpg" alt="">
-    <video id="ceremonyVideo" src="assets/ceremony.mp4" poster="assets/ceremony-start.jpg" playsinline preload="auto"></video>
     <canvas id="fx" aria-hidden="true"></canvas>
-    <div class="ceremony-copy">
-      <p>くじ</p>
-      <h2 class="ceremony-title">席替え</h2>
+    <div class="reveal-banner">
+      <p id="revealKicker" class="reveal-kicker"></p>
+      <h2 id="revealName" class="reveal-name">席替え</h2>
     </div>
     <button type="button" id="skipCeremony">演出をスキップ</button>
   </div>

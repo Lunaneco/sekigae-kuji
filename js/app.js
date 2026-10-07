@@ -853,14 +853,9 @@
     if (!withShow || reduceMotion()) { flash(resultMessage()); return; }
     busy = true;
     renderStatus();
-    document.querySelectorAll(".seat").forEach(function (seat) { seat.classList.add("is-secret"); });
-    runCeremony().then(function (skipped) {
-      if (skipped) {
-        document.querySelectorAll(".seat").forEach(function (seat) { seat.classList.remove("is-secret"); });
-        return;
-      }
-      return revealRows();
-    }).then(function () {
+    runShow().then(function () {
+      renderRoom();
+      revealRoom();
       busy = false;
       renderStatus();
       flash(resultMessage());
@@ -879,65 +874,130 @@
     return "席が決まりました。";
   }
 
-  function playVideo(video) {
-    return new Promise(function (resolve) {
-      var done = false;
-      function finish() { if (!done) { done = true; resolve(); } }
-      video.onended = finish;
-      video.onerror = finish;
-      var playing = video.play();
-      if (playing && playing.catch) playing.catch(finish);
-      setTimeout(finish, 12000);
-    });
+  function shuffleNodes(list) {
+    for (var i = list.length - 1; i > 0; i -= 1) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var swap = list[i];
+      list[i] = list[j];
+      list[j] = swap;
+    }
+    return list;
   }
-  function runCeremony() {
+  function showPace(index, total) {
+    var t = total <= 1 ? 1 : index / (total - 1);
+    var charge = 440 - t * 240;
+    var hold = 540 - t * 280;
+    if (total > 28) { charge *= 0.75; hold *= 0.75; }
+    if (total > 45) { charge *= 0.75; hold *= 0.75; }
+    return { charge: Math.max(160, Math.round(charge)), hold: Math.max(320, Math.round(hold)) };
+  }
+  function seatPlace(seat) {
+    var parts = String(seat.title || "").split("、");
+    if (parts.length >= 2) return parts[0] + "、" + parts[1];
+    return parts[0];
+  }
+  function seatLabel(seat) {
+    var num = seat.querySelector(".seat-num");
+    var name = seat.querySelector(".seat-name");
+    var number = num ? num.textContent : "";
+    var person = name ? name.textContent : "";
+    return (number ? number + " " : "") + person;
+  }
+  function setCopy(name, kicker) {
+    var title = document.getElementById("revealName");
+    var note = document.getElementById("revealKicker");
+    if (note) note.textContent = kicker || "";
+    if (!title) return;
+    title.textContent = name || "";
+    title.classList.remove("is-hit");
+    void title.offsetWidth;
+    title.classList.add("is-hit");
+  }
+  function fitShowChart() {
+    var room = document.getElementById("room");
+    var stack = room && room.querySelector(".room-stack");
+    if (!stack) return;
+    stack.style.zoom = "1";
+    var availW = Math.max(1, room.clientWidth - 8);
+    var availH = Math.max(1, room.clientHeight - 8);
+    var scale = Math.min(1, availW / Math.max(1, stack.offsetWidth), availH / Math.max(1, stack.offsetHeight));
+    if (!isFinite(scale) || scale < 0.2) scale = 0.2;
+    stack.style.zoom = String(Math.round(scale * 1000) / 1000);
+  }
+  function flashOnce() {
+    var flashEl = document.getElementById("flash");
+    flashEl.classList.remove("on");
+    void flashEl.offsetWidth;
+    flashEl.classList.add("on");
+  }
+  function shakeStage() {
+    var panel = document.querySelector(".room-panel");
+    if (!panel) return;
+    panel.classList.remove("is-shaking");
+    void panel.offsetWidth;
+    panel.classList.add("is-shaking");
+  }
+  function runShow() {
     return new Promise(function (resolve) {
-      var root = document.getElementById("ceremony");
-      var video = document.getElementById("ceremonyVideo");
+      var seats = shuffleNodes([].slice.call(document.querySelectorAll(".seat[data-student]")));
+      var step = -1;
+      var timer = 0;
       var closed = false;
-      function finish(skipped) {
+      function finish() {
         if (closed) return;
         closed = true;
+        clearTimeout(timer);
         stopFx();
-        video.pause();
-        root.hidden = true;
-        resolve(!!skipped);
+        document.getElementById("ceremony").hidden = true;
+        document.body.classList.remove("is-reveal");
+        var panel = document.querySelector(".room-panel");
+        if (panel) panel.classList.remove("is-shaking");
+        document.querySelectorAll(".decide-stamp").forEach(function (el) { el.remove(); });
+        resolve();
       }
-      document.getElementById("skipCeremony").onclick = function () { finish(true); };
-      root.hidden = false;
-      video.muted = !state.sound;
-      try { video.currentTime = 0; } catch (err) { /* 未読込でも演出は続ける */ }
+      document.getElementById("skipCeremony").onclick = finish;
+      document.body.classList.add("is-reveal");
+      seats.forEach(function (seat) { seat.classList.add("is-secret"); });
+      syncBoard();
+      fitShowChart();
+      document.getElementById("ceremony").hidden = false;
       startFx();
-      thud(90);
-      var started = performance.now();
-      playVideo(video).then(function () {
-        var hold = video.error ? 2600 : 280;
-        setTimeout(function () { finish(false); }, Math.max(0, hold - (performance.now() - started)));
-      });
-    });
-  }
-  function revealRows() {
-    return new Promise(function (resolve) {
-      var rows = [].slice.call(document.querySelectorAll(".seat-row"));
-      var index = 0;
+      setCopy("席替え", "一人ずつ");
+      thud(78);
+      burstAt(window.innerWidth * 0.5, 92, 90);
       function next() {
-        if (index >= rows.length) { stampDecide(); resolve(); return; }
-        var row = rows[index];
-        index += 1;
-        row.querySelectorAll(".seat").forEach(function (seat) {
-          seat.classList.remove("is-secret");
+        if (closed) return;
+        if (step >= 0 && seats[step]) seats[step].classList.remove("is-calling");
+        step += 1;
+        if (step >= seats.length) {
+          setCopy("決定", seats.length ? seats.length + "人" : "");
+          stampDecide();
+          burstAt(window.innerWidth * 0.5, window.innerHeight * 0.42, 180);
+          thud(64);
+          flashOnce();
+          shakeStage();
+          timer = setTimeout(finish, 1100);
+          return;
+        }
+        var seat = seats[step];
+        var pace = showPace(step, seats.length);
+        seat.classList.add("is-calling");
+        setCopy("？", seatPlace(seat) + "　" + (step + 1) + " / " + seats.length);
+        charge();
+        timer = setTimeout(function () {
+          if (closed) return;
+          seat.classList.remove("is-secret", "is-calling");
           seat.classList.add("is-slam");
-        });
-        thud(150 + index * 12);
-        var flashEl = document.getElementById("flash");
-        flashEl.classList.remove("on");
-        void flashEl.offsetWidth;
-        flashEl.classList.add("on");
-        var stack = document.querySelector(".room-stack");
-        if (stack) { stack.classList.remove("is-shaking"); void stack.offsetWidth; stack.classList.add("is-shaking"); }
-        setTimeout(next, 480);
+          setCopy(seatLabel(seat), seatPlace(seat) + "　" + (step + 1) + " / " + seats.length);
+          var rect = seat.getBoundingClientRect();
+          burstAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 78);
+          flashOnce();
+          shakeStage();
+          thud(150 + Math.min(step, 18) * 8);
+          timer = setTimeout(next, pace.hold);
+        }, pace.charge);
       }
-      next();
+      timer = setTimeout(next, 780);
     });
   }
   function stampDecide() {
@@ -961,14 +1021,31 @@
     var gain = ctx.createGain();
     osc.type = "triangle";
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(42, ctx.currentTime + 0.2);
+    osc.frequency.exponentialRampToValueAtTime(42, ctx.currentTime + 0.22);
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+    gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.32);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.3);
+    osc.stop(ctx.currentTime + 0.34);
+  }
+  function charge() {
+    var ctx = audio();
+    if (!ctx) return;
+    [0, 0.09, 0.18].forEach(function (delay, index) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(220 + index * 110, ctx.currentTime + delay);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + delay + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.07);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.08);
+    });
   }
   function startFx() {
     var canvas = document.getElementById("fx");
@@ -979,54 +1056,64 @@
       canvas.height = window.innerHeight;
     }
     resize();
-    function spawn(width, height) {
-      var angle = Math.random() * Math.PI * 2;
-      var speed = 90 + Math.random() * 720;
-      particles.push({
-        x: width * 0.5, y: height * 0.46,
-        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        life: 0.45 + Math.random() * 0.7, age: 0,
-        size: 1.4 + Math.random() * 3.2,
-        color: Math.random() > 0.7 ? "#fff6d0" : Math.random() > 0.4 ? "#ffb703" : "#ff7a18"
-      });
+    function burst(x, y, count) {
+      var big = count > 120;
+      for (var i = 0; i < count; i += 1) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 70 + Math.random() * (big ? 980 : 560);
+        var ring = big ? 0 : 34;
+        particles.push({
+          x: x + Math.cos(angle) * ring,
+          y: y + Math.sin(angle) * ring,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - (big ? 40 : 120),
+          life: 0.38 + Math.random() * 0.5,
+          age: 0,
+          size: 1.8 + Math.random() * (big ? 5 : 3.4),
+          color: Math.random() > 0.74 ? "#fff6d0" : Math.random() > 0.42 ? "#ffb703" : "#ff5a1f"
+        });
+      }
     }
+    canvas._burst = burst;
+    canvas._resize = resize;
+    window.addEventListener("resize", resize);
     var last = performance.now();
     function frame(now) {
       var dt = Math.min(0.033, (now - last) / 1000);
       last = now;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      while (particles.length < 220) spawn(canvas.width, canvas.height);
+      var alive = [];
       particles.forEach(function (particle) {
         particle.age += dt;
+        if (particle.age > particle.life) return;
         particle.x += particle.vx * dt;
         particle.y += particle.vy * dt;
-        particle.vy += 40 * dt;
-        if (particle.age > particle.life) {
-          particle.age = 0;
-          particle.x = canvas.width * 0.5;
-          particle.y = canvas.height * 0.46;
-          var angle = Math.random() * Math.PI * 2;
-          var speed = 90 + Math.random() * 720;
-          particle.vx = Math.cos(angle) * speed;
-          particle.vy = Math.sin(angle) * speed;
-        }
+        particle.vy += 320 * dt;
         ctx.globalAlpha = Math.max(0, 1 - particle.age / particle.life);
         ctx.fillStyle = particle.color;
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
         ctx.fill();
+        alive.push(particle);
       });
+      particles = alive;
       ctx.globalAlpha = 1;
       fxTimer = requestAnimationFrame(frame);
     }
     fxTimer = requestAnimationFrame(frame);
-    window.addEventListener("resize", resize);
-    canvas._resize = resize;
+  }
+  function burstAt(x, y, count) {
+    var canvas = document.getElementById("fx");
+    if (canvas && canvas._burst) canvas._burst(x, y, count);
   }
   function stopFx() {
     cancelAnimationFrame(fxTimer);
     var canvas = document.getElementById("fx");
+    if (!canvas) return;
     if (canvas._resize) window.removeEventListener("resize", canvas._resize);
+    canvas._burst = null;
+    canvas._resize = null;
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
   }
 
   function columnLabel(index) {
@@ -1402,7 +1489,10 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !document.getElementById("ceremony").hidden) document.getElementById("skipCeremony").click();
     });
-    window.addEventListener("resize", syncBoard);
+    window.addEventListener("resize", function () {
+      syncBoard();
+      if (document.body.classList.contains("is-reveal")) fitShowChart();
+    });
   }
 
   load();

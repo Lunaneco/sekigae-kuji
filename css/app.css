@@ -172,7 +172,22 @@ input, select {
     repeating-linear-gradient(45deg, #1a315c 0 10px, #244074 10px 20px);
 }
 .seat.is-secret .seat-num, .seat.is-secret .seat-name, .seat.is-secret .seat-tag { opacity: 0; }
+.seat.is-calling {
+  z-index: 5;
+  filter: none;
+  animation: callPulse 0.22s ease-in-out infinite;
+  box-shadow: 0 0 0 4px #ffe08a, 0 0 36px 10px rgba(255, 122, 24, 0.95);
+}
 .seat.is-slam { animation: slam 0.42s cubic-bezier(.2, 1.4, .4, 1) both; }
+.seat.is-slam::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 3px solid #ffe08a;
+  border-radius: 14px;
+  pointer-events: none;
+  animation: ringOut 0.48s ease-out both;
+}
 button.pad.is-gap {
   appearance: none;
   -webkit-appearance: none;
@@ -225,32 +240,86 @@ button.pad.is-gap {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0;
 }
 
+body.is-reveal { overflow: hidden; }
+body.is-reveal .top,
+body.is-reveal .drawbar,
+body.is-reveal .workspace > .panel:not(.room-panel) { display: none !important; }
+body.is-reveal .workspace { display: block; width: auto; padding: 0; }
+body.is-reveal .room-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 136px 16px 76px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 170, 50, 0.2), transparent 34%),
+    #16110d;
+}
+body.is-reveal .room-panel > :not(#room) { display: none !important; }
+body.is-reveal #room {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+body.is-reveal .room-stack { margin: 0; }
+body.is-reveal .view-note { display: none; }
+body.is-reveal .front-label,
+body.is-reveal .back-label,
+body.is-reveal .row-label { color: #f0e2c4; }
+body.is-reveal .seat.is-secret:not(.is-calling) { filter: brightness(0.38) saturate(0.25); }
+
 .ceremony {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: #07060a;
-  display: grid;
-  place-items: center;
+  background: transparent;
+  pointer-events: none;
 }
 .ceremony[hidden] { display: none; }
-.ceremony-still, #ceremonyVideo, #fx { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.ceremony-still.end { opacity: 0; animation: boomIn 1.1s ease-in 0.15s forwards; }
-#ceremonyVideo { z-index: 1; }
-#fx { z-index: 2; pointer-events: none; }
-.ceremony-copy { position: relative; z-index: 3; text-align: center; color: #fff6d2; }
-.ceremony-copy p { margin: 0; letter-spacing: 0.6em; }
-.ceremony-title {
-  margin: 0;
-  font-size: clamp(4.5rem, 14vw, 9rem);
-  letter-spacing: 0.18em;
-  text-shadow: 0 0 18px #ffb703, 0 0 48px #ff6a00, 0 8px 0 #6a2a00;
-  animation: slamTitle 0.7s cubic-bezier(.15, 1.35, .4, 1) both;
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+.reveal-banner {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 16px;
+  z-index: 3;
+  text-align: center;
+  color: #fff6d2;
 }
+.reveal-kicker {
+  margin: 0;
+  min-height: 1.4em;
+  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+  color: #ffe7a3;
+}
+.reveal-name {
+  margin: 0;
+  min-height: 1.15em;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: clamp(2.8rem, 7vw, 5.4rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 16px #ffb703, 0 0 42px #ff6a00, 0 6px 0 #6a2a00;
+}
+.reveal-name.is-hit { animation: nameHit 0.18s cubic-bezier(.15, 1.45, .4, 1) both; }
 #skipCeremony {
+  pointer-events: auto;
   position: absolute;
   z-index: 4;
-  bottom: 28px;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   border: 0;
   border-radius: 999px;
   padding: 0.7rem 1.2rem;
@@ -282,8 +351,14 @@ button.pad.is-gap {
 }
 .is-shaking { animation: shake 0.4s linear; }
 
-@keyframes slam { from { transform: scale(1.55) rotate(-5deg); filter: brightness(2.2); } to { transform: none; filter: none; } }
-@keyframes slamTitle { from { transform: scale(2.1); filter: blur(10px); opacity: 0; } to { transform: none; filter: none; opacity: 1; } }
+@keyframes slam { from { transform: scale(1.7) rotate(-6deg); filter: brightness(2.4); } to { transform: none; filter: none; } }
+@keyframes slamTitle { from { transform: scale(1.8); filter: blur(8px); opacity: 0; } to { transform: none; filter: none; opacity: 1; } }
+@keyframes nameHit { from { transform: scale(1.45); filter: brightness(1.8); } to { transform: none; filter: none; } }
+@keyframes callPulse {
+  0%, 100% { transform: scale(1.06); }
+  50% { transform: scale(1.22); }
+}
+@keyframes ringOut { from { opacity: 1; transform: scale(0.72); } to { opacity: 0; transform: scale(1.65); } }
 @keyframes boomIn { to { opacity: 1; } }
 @keyframes goldFlash { from { opacity: 1; } to { opacity: 0; } }
 @keyframes stampIn { from { transform: translate(-50%, -50%) scale(1.6) rotate(-12deg); opacity: 0; } to { opacity: 1; } }
