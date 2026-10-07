@@ -195,7 +195,7 @@ const holeFile = X.posterFile({
   resolve: function (row, col) { return { number: String(col + 1), name: "人", kind: "open" }; }
 });
 const holeXml = sheetXmlOf(holeFile, "xl/worksheets/sheet1.xml");
-check("抜いた席はExcelに出さない", holeXml.indexOf('r="B3"') >= 0 && holeXml.indexOf('r="D3"') >= 0 && holeXml.indexOf('r="C3"') < 0 && holeXml.indexOf("×") < 0 && holeXml.indexOf('showGridLines="0"') >= 0);
+check("抜いた席はExcelに出さない", holeXml.indexOf('r="B3"') >= 0 && holeXml.indexOf('r="F3"') >= 0 && holeXml.indexOf('r="D3"') < 0 && holeXml.indexOf("×") < 0 && holeXml.indexOf('showGridLines="0"') >= 0);
 check("式として始まる文字を避ける", S.excelSafe("=1+1") === "'=1+1" && S.excelSafe("青葉") === "青葉");
 
 execFileSync("python3", ["-c", "open('/tmp/sekigae-sjis.csv','w',encoding='cp932').write('出席番号,氏名\\n1,青葉 湊\\n')"]);
@@ -218,10 +218,10 @@ execFileSync("python3", ["-c", "import zipfile; zipfile.ZipFile('/tmp/sekigae-po
 const book = XLSX.read(poster, { type: "array" });
 const sheet = book.Sheets[book.SheetNames[0]];
 check("黒板が結合の起点", sheet.B2 && sheet.B2.v === "黒板");
-const boardMerge = (sheet["!merges"] || []).some((m) => m.s.c === 1 && m.s.r === 1 && m.e.c === 4);
+const boardMerge = (sheet["!merges"] || []).some((m) => m.s.c === 1 && m.s.r === 1 && m.e.c === 7);
 check("黒板は席の幅いっぱい", boardMerge);
-check("短い列の人は中央列", sheet.C3 && String(sheet.C3.v).indexOf("=1+1") >= 0);
-check("名前は計算されない", sheet.C3.t !== "n");
+check("短い列の人は中央列", sheet.D3 && String(sheet.D3.v).indexOf("=1+1") >= 0);
+check("名前は計算されない", sheet.D3.t !== "n");
 const teacher = X.teacherFile({
   caption: "教員用",
   header: "教員用",
@@ -251,7 +251,7 @@ const wideXml = sheetXmlOf(X.posterFile({
 const wideWidths = colWidths(wideXml);
 const posterSum = posterWidths.reduce(function (sum, n) { return sum + n; }, 0);
 check("掲示用はA4横1枚", posterXml.indexOf('paperSize="9"') >= 0 && posterXml.indexOf('orientation="landscape"') >= 0 && posterXml.indexOf('fitToWidth="1"') >= 0 && posterXml.indexOf('fitToHeight="1"') >= 0 && posterXml.indexOf('fitToPage="1"') >= 0);
-check("席が多いと列が狭くなる", wideWidths.length === 13 && posterWidths.length === 5 && wideWidths[1] < posterWidths[1]);
+check("席が多いと列が狭くなる", wideWidths.length === 24 && posterWidths.length === 8 && wideWidths[1] < posterWidths[1]);
 check("掲示用の幅がA4に近い", posterSum > 90 && posterSum < 145 && Math.abs(posterSum - colWidths(wideXml).reduce(function (sum, n) { return sum + n; }, 0)) < 8);
 fs.writeFileSync("/tmp/sekigae-page.xlsx", Buffer.from(teacher));
 const teacherSheet = sheetXmlOf(teacher, "xl/worksheets/sheet1.xml");
@@ -275,7 +275,14 @@ const girlPoster = X.posterFile({
 });
 const girlXml = sheetXmlOf(girlPoster, "xl/worksheets/sheet1.xml");
 const girlStyles = sheetXmlOf(girlPoster, "xl/styles.xml");
-check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="C3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0);
+check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="D3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0);
+const girlWidths = colWidths(girlXml);
+const gapRow = posterXml.match(/<row r="4" ht="([\d.]+)"/);
+const seatRow = posterXml.match(/<row r="3" ht="([\d.]+)"/);
+check("席の間に余白がある", girlWidths.length === 4 && girlWidths[2] < girlWidths[1] && girlXml.indexOf('r="C3"') < 0 && gapRow && seatRow && Number(gapRow[1]) < Number(seatRow[1]));
+check("出力の色は白黒とグレー", Array.from(girlStyles.matchAll(/rgb="FF([0-9A-F]{6})"/g)).every(function (match) {
+  return match[1].slice(0, 2) === match[1].slice(2, 4) && match[1].slice(2, 4) === match[1].slice(4, 6);
+}));
 const boyXml = sheetXmlOf(X.posterFile({
   caption: "男",
   header: "男",

@@ -93,57 +93,95 @@
     return out;
   }
 
+  function fontXml(size, color, bold) {
+    return "<font>" + (bold ? "<b/>" : "") + '<sz val="' + size + '"/>' +
+      (color ? '<color rgb="' + color + '"/>' : "") +
+      '<name val="游ゴシック"/><charset val="128"/></font>';
+  }
+
+  function solidFill(rgb) {
+    return '<fill><patternFill patternType="solid"><fgColor rgb="' + rgb + '"/></patternFill></fill>';
+  }
+
+  function boxBorder(style, rgb) {
+    return ["left", "right", "top", "bottom"].map(function (edge) {
+      return "<" + edge + ' style="' + style + '"><color rgb="' + rgb + '"/></' + edge + ">";
+    }).join("");
+  }
+
+  function cellXf(fontId, fillId, borderId, align, wrap) {
+    return '<xf numFmtId="0" fontId="' + fontId + '" fillId="' + fillId + '" borderId="' + borderId + '" xfId="0" applyFont="1"' +
+      (fillId ? ' applyFill="1"' : "") + (borderId ? ' applyBorder="1"' : "") + ' applyAlignment="1">' +
+      '<alignment horizontal="' + align + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + "/></xf>";
+  }
+
   function stylesXml(fonts) {
     fonts = fonts || {};
     var board = fonts.board || 26;
     var seat = fonts.seat || 14;
     var empty = fonts.empty || 12;
     var aisle = fonts.aisle || 11;
+    var ink = "FF1A1A1A";
+    var white = "FFFFFFFF";
+    var gray = "FF8A8A8A";
+    var line = "FFC8C8C8";
+    var hair = "FFD4D4D4";
+    var fills = [
+      '<fill><patternFill patternType="none"/></fill>',
+      '<fill><patternFill patternType="gray125"/></fill>',
+      solidFill(ink),
+      solidFill(white),
+      solidFill("FFF3F3F3"),
+      solidFill(white),
+      solidFill("FFE6E6E6"),
+      solidFill("FFF7F7F7"),
+      solidFill(ink),
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="' + gray + '"/><bgColor rgb="' + white + '"/></patternFill></fill>',
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="' + gray + '"/><bgColor rgb="' + white + '"/></patternFill></fill>',
+      '<fill><patternFill patternType="lightDown"><fgColor rgb="' + gray + '"/><bgColor rgb="FFE6E6E6"/></patternFill></fill>',
+      solidFill("FFF4F4F4")
+    ];
+    var borders = [
+      "<border><left/><right/><top/><bottom/></border>",
+      "<border>" + boxBorder("thin", line) + "</border>",
+      "<border>" + boxBorder("medium", ink) + "</border>",
+      "<border>" + boxBorder("hair", hair) + "</border>"
+    ];
+    var xfs = [
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',
+      cellXf(1, 0, 0, "center", false),
+      cellXf(2, 2, 0, "center", false),
+      cellXf(3, 3, 1, "center", true),
+      cellXf(4, 4, 1, "center", false),
+      cellXf(3, 5, 2, "center", true),
+      cellXf(3, 6, 1, "center", true),
+      cellXf(5, 7, 0, "center", false),
+      cellXf(6, 8, 0, "center", false),
+      cellXf(7, 3, 3, "center", false),
+      cellXf(3, 9, 1, "center", true),
+      cellXf(3, 10, 2, "center", true),
+      cellXf(3, 11, 1, "center", true),
+      cellXf(7, 12, 3, "center", false),
+      cellXf(8, 0, 0, "center", false)
+    ];
     return (
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<fonts count="7">' +
-      '<font><sz val="11"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="12"/><color rgb="FF241C16"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="' + board + '"/><color rgb="FFF3F7EA"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="' + seat + '"/><color rgb="FF241C16"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><sz val="' + empty + '"/><color rgb="FF6D6256"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><sz val="' + aisle + '"/><color rgb="FF415064"/><name val="游ゴシック"/><charset val="128"/></font>' +
-      '<font><b/><sz val="12"/><color rgb="FFF6F0E4"/><name val="游ゴシック"/><charset val="128"/></font>' +
+      '<fonts count="9">' +
+      fontXml(11, ink, false) +
+      fontXml(11, "FF5C5C5C", false) +
+      fontXml(board, white, true) +
+      fontXml(seat, ink, true) +
+      fontXml(empty, gray, false) +
+      fontXml(aisle, "FF6E6E6E", false) +
+      fontXml(11, white, true) +
+      fontXml(11, ink, false) +
+      fontXml(16, ink, true) +
       "</fonts>" +
-      '<fills count="12">' +
-      '<fill><patternFill patternType="none"/></fill>' +
-      '<fill><patternFill patternType="gray125"/></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FF1B3A32"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFFBF6EA"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFE6E1D6"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFF8E4E0"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFF8E8C8"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFD5DDE6"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FF243044"/></patternFill></fill>' +
-      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFFBF6EA"/></patternFill></fill>' +
-      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFF8E4E0"/></patternFill></fill>' +
-      '<fill><patternFill patternType="lightDown"><fgColor rgb="FF8A7358"/><bgColor rgb="FFF8E8C8"/></patternFill></fill>' +
-      "</fills>" +
-      '<borders count="2"><border><left/><right/><top/><bottom/></border>' +
-      '<border><left style="thin"><color rgb="FF2A241C"/></left><right style="thin"><color rgb="FF2A241C"/></right>' +
-      '<top style="thin"><color rgb="FF2A241C"/></top><bottom style="thin"><color rgb="FF2A241C"/></bottom></border></borders>' +
+      '<fills count="' + fills.length + '">' + fills.join("") + "</fills>" +
+      '<borders count="' + borders.length + '">' + borders.join("") + "</borders>" +
       '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-      '<cellXfs count="13">' +
-      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
-      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="6" fillId="8" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="9" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="10" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="0" fontId="3" fillId="11" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      "</cellXfs></styleSheet>"
+      '<cellXfs count="' + xfs.length + '">' + xfs.join("") + "</cellXfs></styleSheet>"
     );
   }
 
@@ -177,7 +215,7 @@
     return (
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' +
+      "<sheetPr>" + (model.tabColor ? '<tabColor rgb="' + model.tabColor + '"/>' : "") + '<pageSetUpPr fitToPage="1"/></sheetPr>' +
       '<dimension ref="A1:' + colLetter(Math.max(1, maxCol)) + Math.max(1, maxRow) + '"/>' +
       "<sheetViews><sheetView workbookViewId=\"0\"" + (model.showGridLines === false ? ' showGridLines="0"' : "") + (selected ? ' tabSelected="1"' : "") + ">" + pane + "</sheetView></sheetViews>" +
       '<sheetFormatPr defaultRowHeight="18"/>' +
@@ -251,24 +289,36 @@
   function chartMetrics(slotCount, lineCount) {
     var printableW = 297 / 25.4 - 0.8;
     var printableH = (210 / 25.4 - 0.85) * 72;
-    var labelIn = Math.min(1, Math.max(0.72, printableW * 0.1));
-    var seatIn = (printableW - labelIn) / Math.max(1, slotCount);
     var slack = 0.96;
-    var captionPt = 18;
+    var gaps = Math.max(0, slotCount - 1);
+    var gapIn = gaps ? 0.16 : 0;
+    var labelIn = Math.min(0.95, Math.max(0.7, printableW * 0.09));
+    var seatIn = (printableW - labelIn - gapIn * gaps) / Math.max(1, slotCount);
+    var target = inchesToWch(printableW * slack);
+    var labelWch = inchesToWch(labelIn * slack);
+    var gapWch = gaps ? Math.round(((gapIn * 96 - 5) / 8) * 10) / 10 : 0;
+    if (gapWch < 0.8) gapWch = 0.8;
+    var seatWch = Math.round(((target - labelWch - gapWch * gaps) / Math.max(1, slotCount)) * 10) / 10;
+    if (seatWch < 3) seatWch = 3;
+    var captionPt = 26;
     var backPt = 16;
+    var gapPt = 10;
     var boardPt = Math.max(28, Math.min(44, Math.round(printableH * 0.11)));
-    var natural = (printableH * slack - captionPt - boardPt - backPt) / Math.max(1, lineCount);
+    var between = Math.max(0, lineCount - 1) * gapPt;
+    var natural = (printableH * slack - captionPt - boardPt - backPt - between) / Math.max(1, lineCount);
     var seatPt = Math.max(26, Math.min(72, Math.round(natural)));
-    var cellWpt = seatIn * slack * 72;
+    var cellWpt = (seatWch * 8 + 5) / 96 * 72;
     var byWidth = Math.floor(cellWpt / 5.2);
     var byHeight = Math.floor((seatPt - 6) / 2.15);
     var seatFont = Math.max(8, Math.min(16, byWidth, byHeight));
     return {
-      labelWch: inchesToWch(labelIn * slack),
-      seatWch: inchesToWch(seatIn * slack),
+      labelWch: labelWch,
+      seatWch: seatWch,
+      gapWch: gaps ? gapWch : 0,
       captionPt: captionPt,
       boardPt: boardPt,
       seatPt: seatPt,
+      gapPt: gapPt,
       backPt: backPt,
       fonts: {
         board: Math.max(16, Math.min(28, Math.round((cellWpt * Math.max(1, slotCount)) / 16))),
@@ -285,15 +335,19 @@
     var metrics = chartMetrics(maxSlots, grid.lines.length);
     var cols = [{ wch: metrics.labelWch }];
     var c;
-    for (c = 0; c < maxSlots; c += 1) cols.push({ wch: metrics.seatWch });
+    for (c = 0; c < maxSlots; c += 1) {
+      cols.push({ wch: metrics.seatWch });
+      if (c < maxSlots - 1) cols.push({ wch: metrics.gapWch });
+    }
     var rows = [
-      { hpt: metrics.captionPt, cells: [{ col: 1, value: options.caption, style: 1 }] },
+      { hpt: metrics.captionPt, cells: [{ col: 1, value: options.caption, style: 14 }] },
       { hpt: metrics.boardPt, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] },
     ];
-    grid.lines.forEach(function (line) {
+    grid.lines.forEach(function (line, lineIndex) {
+      if (lineIndex > 0) rows.push({ hpt: metrics.gapPt, cells: [] });
       var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
       line.cells.forEach(function (cell, index) {
-        var col = index + 2;
+        var col = 2 + index * 2;
         if (cell.type === "pad" || cell.type === "gap") return;
         if (cell.type === "aisle") {
           cells.push({ col: col, value: "通路", style: 7 });
@@ -305,7 +359,7 @@
       rows.push({ hpt: metrics.seatPt, cells: cells });
     });
     rows.push({ hpt: metrics.backPt, cells: [{ col: 2, value: "うしろ", style: 1 }] });
-    var lastCol = maxSlots + 1;
+    var lastCol = cols.length;
     var lastRow = rows.length;
     return {
       cols: cols,
@@ -325,6 +379,7 @@
       centerVertical: true,
       fonts: metrics.fonts,
       showGridLines: false,
+      tabColor: "FF2A2A2A",
       printArea: "$A$1:$" + colLetter(lastCol) + "$" + lastRow,
     };
   }
@@ -337,14 +392,15 @@
     for (w = 0; w < weights.length; w += 1) weightSum += weights[w];
     var totalWch = inchesToWch((210 / 25.4 - 0.8) * 0.96);
     var rows = [{
-      hpt: 22,
+      hpt: 24,
       cells: header.map(function (value, index) { return { col: index + 1, value: value, style: 8 }; }),
     }];
-    list.forEach(function (item) {
+    list.forEach(function (item, index) {
       var values = [item.rowLabel, item.fromLeft, item.fromTeacher, item.number, item.name, item.gender, item.how];
+      var style = index % 2 ? 13 : 9;
       rows.push({
-        hpt: 18,
-        cells: values.map(function (value, index) { return { col: index + 1, value: value == null ? "" : String(value), style: 9 }; }),
+        hpt: 20,
+        cells: values.map(function (value, colIndex) { return { col: colIndex + 1, value: value == null ? "" : String(value), style: style }; }),
       });
     });
     return {
@@ -361,6 +417,8 @@
       centerVertical: false,
       printArea: "$A$1:$G$" + Math.max(1, rows.length),
       printTitle: "$1:$1",
+      showGridLines: false,
+      tabColor: "FF6A6A6A",
     };
   }
 
