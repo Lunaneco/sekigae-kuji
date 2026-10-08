@@ -385,7 +385,10 @@ const girlPoster = X.posterFile({
 });
 const girlXml = sheetXmlOf(girlPoster, "xl/worksheets/sheet1.xml");
 const girlStyles = sheetXmlOf(girlPoster, "xl/styles.xml");
-check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="D3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0);
+const girlDrawing = sheetXmlOf(girlPoster, "xl/drawings/drawing1.xml");
+const pngHead = execFileSync("python3", ["-c", "import zipfile; print(zipfile.ZipFile('/tmp/sekigae-page.xlsx').read('xl/media/hatch.png')[:4].hex())"], { encoding: "utf8" }).trim();
+check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="D3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0 && girlStyles.indexOf("FF4A4A4A") >= 0);
+check("女子の席に網の絵がある", girlXml.indexOf("<drawing ") >= 0 && girlDrawing.split("<xdr:twoCellAnchor>").length === 3 && girlDrawing.indexOf("<xdr:col>1</xdr:col>") >= 0 && girlDrawing.indexOf("<xdr:col>3</xdr:col>") >= 0 && girlDrawing.indexOf("<xdr:row>2</xdr:row>") >= 0 && pngHead === "89504e47");
 const girlWidths = colWidths(girlXml);
 const gapRow = posterXml.match(/<row r="4" ht="([\d.]+)"/);
 const seatRow = posterXml.match(/<row r="3" ht="([\d.]+)"/);
@@ -399,7 +402,7 @@ const boyXml = sheetXmlOf(X.posterFile({
   grid: S.buildChartGrid([1], {}),
   resolve: function () { return { number: "1", name: "蓮", kind: "open", gender: "男" }; }
 }), "xl/worksheets/sheet1.xml");
-check("男子の席は網掛けしない", boyXml.indexOf('s="10"') < 0 && boyXml.indexOf('s="3"') >= 0);
+check("男子の席は網掛けしない", boyXml.indexOf('s="10"') < 0 && boyXml.indexOf('s="3"') >= 0 && boyXml.indexOf("<drawing ") < 0);
 const longName = "あいうえおかきくけこさしすせそ";
 const longPoster = X.posterFile({
   caption: "長い名前",
