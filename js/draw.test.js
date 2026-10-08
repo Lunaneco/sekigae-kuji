@@ -377,6 +377,40 @@ const boyXml = sheetXmlOf(X.posterFile({
   resolve: function () { return { number: "1", name: "蓮", kind: "open", gender: "男" }; }
 }), "xl/worksheets/sheet1.xml");
 check("男子の席は網掛けしない", boyXml.indexOf('s="10"') < 0 && boyXml.indexOf('s="3"') >= 0);
+const longName = "あいうえおかきくけこさしすせそ";
+const longPoster = X.posterFile({
+  caption: "長い名前",
+  header: "長い名前",
+  grid: S.buildChartGrid([6, 6]),
+  resolve: function (row, col) {
+    if (row === 0 && col === 0) return { number: "1", name: longName, kind: "open" };
+    return { number: "2", name: "蓮", kind: "open" };
+  }
+});
+const longXml = sheetXmlOf(longPoster, "xl/worksheets/sheet1.xml");
+const longStyles = sheetXmlOf(longPoster, "xl/styles.xml");
+const longBook = XLSX.read(longPoster, { type: "array" });
+const shown = String(longBook.Sheets[longBook.SheetNames[0]].B3.v);
+const shownLines = shown.split("\n");
+const fontSizes = Array.from(longStyles.matchAll(/<sz val="(\d+)"/g)).map(function (match) { return Number(match[1]); });
+const nameFont = fontSizes[3];
+const nameWidth = (colWidths(longXml)[1] * 8 + 5) / 96 * 72;
+const namePer = Math.max(1, (nameWidth - 14) / (nameFont * 1.15));
+function nameUnits(text) {
+  var total = 0;
+  var i;
+  for (i = 0; i < text.length; i += 1) total += text.charCodeAt(i) <= 0x7f ? 0.55 : 1;
+  return total;
+}
+const longHt = Number(longXml.match(/<row r="3" ht="([\d.]+)"/)[1]);
+const shortHt = Number(longXml.match(/<row r="5" ht="([\d.]+)"/)[1]);
+check("長い名前を全部書く", shown.replace(/\n/g, "") === "1" + longName);
+check("長い名前の各行はマス幅に収まる", shownLines.every(function (line) { return nameUnits(line) <= namePer + 0.05; }));
+check("長い名前の行は文字が収まる高さ", longHt + 0.1 >= shownLines.length * nameFont * 1.5 + 10 && longHt >= shortHt);
+const listXf = longStyles.split('fontId="7"')[1] || "";
+const seatXf = longStyles.split('fontId="3"')[1] || "";
+check("一覧の名前は縮小して全体を表示する", listXf.slice(0, 500).indexOf('shrinkToFit="1"') >= 0);
+check("席の名前は折り返して表示する", seatXf.slice(0, 500).indexOf('wrapText="1"') >= 0);
 
 const before = Object.keys(Object.prototype).length;
 XLSX.read(fs.readFileSync("/tmp/sekigae-poster.xlsx"), { type: "array", cellFormula: false, cellHTML: false, bookVBA: false });

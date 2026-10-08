@@ -109,10 +109,10 @@
     }).join("");
   }
 
-  function cellXf(fontId, fillId, borderId, align, wrap) {
+  function cellXf(fontId, fillId, borderId, align, wrap, shrink) {
     return '<xf numFmtId="0" fontId="' + fontId + '" fillId="' + fillId + '" borderId="' + borderId + '" xfId="0" applyFont="1"' +
       (fillId ? ' applyFill="1"' : "") + (borderId ? ' applyBorder="1"' : "") + ' applyAlignment="1">' +
-      '<alignment horizontal="' + align + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + "/></xf>";
+      '<alignment horizontal="' + align + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + (shrink ? ' shrinkToFit="1"' : "") + "/></xf>";
   }
 
   function stylesXml(fonts) {
@@ -157,11 +157,11 @@
       cellXf(3, 6, 1, "center", true),
       cellXf(5, 7, 0, "center", false),
       cellXf(6, 8, 0, "center", false),
-      cellXf(7, 3, 3, "center", false),
+      cellXf(7, 3, 3, "center", false, true),
       cellXf(3, 9, 1, "center", true),
       cellXf(3, 10, 2, "center", true),
       cellXf(3, 11, 1, "center", true),
-      cellXf(7, 12, 3, "center", false),
+      cellXf(7, 12, 3, "center", false, true),
       cellXf(8, 0, 0, "center", false)
     ];
     return (
@@ -272,10 +272,67 @@
     return zipStore(files);
   }
 
-  function seatText(info) {
+  function textUnits(text) {
+    var units = 0;
+    var i;
+    var s = String(text || "");
+    for (i = 0; i < s.length; i += 1) units += s.charCodeAt(i) <= 0x007f ? 0.55 : 1;
+    return units;
+  }
+
+  function wrapUnits(text, unitsPerLine) {
+    var s = String(text || "");
+    if (!s) return "";
+    var per = unitsPerLine > 1 ? unitsPerLine : 1;
+    var lines = [];
+    var line = "";
+    var used = 0;
+    var i;
+    for (i = 0; i < s.length; i += 1) {
+      var ch = s.charAt(i);
+      var width = s.charCodeAt(i) <= 0x007f ? 0.55 : 1;
+      if (line && used + width > per) {
+        lines.push(line);
+        line = ch;
+        used = width;
+      } else {
+        line += ch;
+        used += width;
+      }
+    }
+    if (line) lines.push(line);
+    return lines.join("\n");
+  }
+
+  function unitsPerLine(cellWpt, font) {
+    return Math.max(1, (cellWpt - 14) / (font * 1.15));
+  }
+
+  function blockPt(number, name, font, per) {
+    var numberLines = wrapUnits(number, per).split("\n").filter(Boolean).length;
+    var nameLines = wrapUnits(name, per).split("\n").filter(Boolean).length;
+    var lines = numberLines + nameLines;
+    if (!lines) lines = 1;
+    return lines * font * 1.5 + 10;
+  }
+
+  function chooseSeatFont(cellWpt, seatPt, entries) {
+    var font;
+    for (font = 16; font >= 6; font -= 1) {
+      var per = unitsPerLine(cellWpt, font);
+      var fits = entries.every(function (entry) { return blockPt(entry.number, entry.name, font, per) <= seatPt + 0.1; });
+      if (fits) return font;
+    }
+    for (font = 12; font >= 6; font -= 1) {
+      if (unitsPerLine(cellWpt, font) >= 3) return font;
+    }
+    return 6;
+  }
+
+  function seatText(info, per) {
     if (!info || !info.name) return { value: "空席", style: 4 };
-    var number = info.number ? String(info.number) : "";
-    var name = String(info.name);
+    var number = info.number ? wrapUnits(String(info.number), per) : "";
+    var name = wrapUnits(String(info.name), per);
     var girl = info.gender === "女";
     var style = info.kind === "pin" ? (girl ? 11 : 5) : info.kind === "group" ? (girl ? 12 : 6) : (girl ? 10 : 3);
     return { value: number ? number + "\n" + name : name, style: style };
@@ -308,13 +365,14 @@
     var natural = (printableH * slack - captionPt - boardPt - backPt - between) / Math.max(1, lineCount);
     var seatPt = Math.max(26, Math.min(72, Math.round(natural)));
     var cellWpt = (seatWch * 8 + 5) / 96 * 72;
-    var byWidth = Math.floor(cellWpt / 5.2);
-    var byHeight = Math.floor((seatPt - 6) / 2.15);
-    var seatFont = Math.max(8, Math.min(16, byWidth, byHeight));
+    var byName = Math.floor((cellWpt - 14) / 4.6);
+    var byHeight = Math.floor((seatPt - 10) / 3);
+    var seatFont = Math.max(8, Math.min(16, byName, byHeight));
     return {
       labelWch: labelWch,
       seatWch: seatWch,
       gapWch: gaps ? gapWch : 0,
+      cellWpt: cellWpt,
       captionPt: captionPt,
       boardPt: boardPt,
       seatPt: seatPt,
@@ -333,6 +391,22 @@
     var grid = options.grid;
     var maxSlots = grid.maxSlots || 1;
     var metrics = chartMetrics(maxSlots, grid.lines.length);
+    var entries = [];
+    grid.lines.forEach(function (line) {
+      line.cells.forEach(function (cell) {
+        if (cell.type !== "seat") return;
+        var info = options.resolve(line.row, cell.col);
+        entries.push({
+          number: info && info.number ? String(info.number) : "",
+          name: info && info.name ? String(info.name) : "空席",
+        });
+      });
+    });
+    var seatFont = chooseSeatFont(metrics.cellWpt, metrics.seatPt, entries);
+    metrics.fonts.seat = seatFont;
+    metrics.fonts.empty = Math.max(6, seatFont - 1);
+    metrics.fonts.aisle = Math.max(6, Math.min(12, seatFont));
+    var per = unitsPerLine(metrics.cellWpt, seatFont);
     var cols = [{ wch: metrics.labelWch }];
     var c;
     for (c = 0; c < maxSlots; c += 1) {
@@ -346,6 +420,7 @@
     grid.lines.forEach(function (line, lineIndex) {
       if (lineIndex > 0) rows.push({ hpt: metrics.gapPt, cells: [] });
       var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
+      var rowPt = metrics.seatPt;
       line.cells.forEach(function (cell, index) {
         var col = 2 + index * 2;
         if (cell.type === "pad" || cell.type === "gap") return;
@@ -353,10 +428,15 @@
           cells.push({ col: col, value: "通路", style: 7 });
           return;
         }
-        var text = seatText(options.resolve(line.row, cell.col));
+        var info = options.resolve(line.row, cell.col);
+        var text = seatText(info, per);
+        var number = info && info.number ? String(info.number) : "";
+        var name = info && info.name ? String(info.name) : "空席";
+        var need = blockPt(number, name, seatFont, per);
+        if (need > rowPt) rowPt = need;
         cells.push({ col: col, value: text.value, style: text.style });
       });
-      rows.push({ hpt: metrics.seatPt, cells: cells });
+      rows.push({ hpt: Math.ceil(rowPt), cells: cells });
     });
     rows.push({ hpt: metrics.backPt, cells: [{ col: 2, value: "うしろ", style: 1 }] });
     var lastCol = cols.length;
@@ -386,7 +466,7 @@
 
   function listModel(list) {
     var header = ["行（前から）", "列（向かって左から）", "列（先生から左から）", "番号", "名前", "性別", "決まり方"];
-    var weights = [14, 16, 18, 10, 20, 8, 16];
+    var weights = [12, 14, 16, 8, 32, 8, 12];
     var weightSum = 0;
     var w;
     for (w = 0; w < weights.length; w += 1) weightSum += weights[w];
