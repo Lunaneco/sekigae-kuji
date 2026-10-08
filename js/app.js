@@ -229,10 +229,6 @@
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
     if (state.gaps.length) bits.push("抜き " + state.gaps.length + "席");
-    if (state.separate) bits.push("二人を離す");
-    if (state.separate && state.assignment && Sekigae.countSeparate(state.assignment, aroundMap(), state.separate) > 0) {
-      bits.push("指定の二人が隣り合っています");
-    }
     var oppositeLeft = state.avoidOpposite && state.assignment
       ? Sekigae.countOpposite(state.students, state.assignment, neighborMap())
       : 0;
@@ -933,9 +929,6 @@
     if (!state.filledBy && state.avoidOpposite && state.assignment) {
       var left = Sekigae.countOpposite(state.students, state.assignment, neighborMap());
       if (left > 0) extra += "周りが異性だけの席が" + left + "人分残っています。";
-    }
-    if (state.separate && state.assignment && Sekigae.countSeparate(state.assignment, aroundMap(), state.separate) > 0) {
-      extra += "指定の二人は隣のままです。";
     }
     return extra ? head + extra : head;
   }
@@ -1770,7 +1763,6 @@
         separateOpen = !separateOpen;
         renderSeparate();
         if (separateOpen) {
-          flash("二人を離す指定を出せます。");
           var box = document.getElementById("separateBox");
           if (box) box.scrollIntoView({ block: "nearest" });
         }
