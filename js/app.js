@@ -8,6 +8,9 @@
   var state = defaultState();
   var pending = null;
   var busy = false;
+  var separateOpen = false;
+  var brandClicks = 0;
+  var brandTimer = 0;
   var audioCtx = null;
   var fxTimer = 0;
   var toastTimer = 0;
@@ -16,7 +19,7 @@
     return {
       v: 1, students: [], rows: [6, 6, 6, 6], columns: null, pins: [], groups: [],
       assignment: null, unseated: [], history: null, aisle: false, teacherView: false,
-      avoidOpposite: false, assignMode: "random", numberFrom: "left", filledBy: "", gaps: [],
+      avoidOpposite: false, assignMode: "random", numberFrom: "left", filledBy: "", gaps: [], separate: null,
       sound: true, mode: "view", draft: null, swapFrom: null, nextId: 1
     };
   }
@@ -50,6 +53,9 @@
   }
   function neighborMap() {
     return Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns, gaps: state.gaps });
+  }
+  function aroundMap() {
+    return Sekigae.seatNeighbors(state.rows, { aisle: state.aisle, columns: state.columns, gaps: state.gaps, diagonal: true });
   }
   function seatCountInRow(row) {
     var n = 0;
@@ -177,6 +183,11 @@
     next.aisle = !!data.aisle;
     next.teacherView = !!data.teacherView;
     next.avoidOpposite = !!data.avoidOpposite;
+    if (Array.isArray(data.separate) && data.separate.length === 2) {
+      var separateA = cleanId(data.separate[0], "s");
+      var separateB = cleanId(data.separate[1], "s");
+      if (separateA && separateB && separateA !== separateB && knownS[separateA] && knownS[separateB]) next.separate = [separateA, separateB];
+    }
     next.assignMode = data.assignMode === "number" ? "number" : "random";
     next.numberFrom = data.numberFrom === "right" ? "right" : "left";
     next.filledBy = data.filledBy === "left" || data.filledBy === "right" ? data.filledBy : "";
@@ -218,6 +229,10 @@
     if (state.pins.length) bits.push("固定 " + state.pins.length);
     if (state.groups.length) bits.push("限定抽選 " + state.groups.length + "組");
     if (state.gaps.length) bits.push("抜き " + state.gaps.length + "席");
+    if (state.separate) bits.push("二人を離す");
+    if (state.separate && state.assignment && Sekigae.countSeparate(state.assignment, aroundMap(), state.separate) > 0) {
+      bits.push("指定の二人が隣り合っています");
+    }
     var oppositeLeft = state.avoidOpposite && state.assignment
       ? Sekigae.countOpposite(state.students, state.assignment, neighborMap())
       : 0;
@@ -572,6 +587,7 @@
     }
     var option = document.querySelector('#pinStudent option[value="' + id + '"]');
     if (option) option.textContent = (student.number ? student.number + " " : "") + student.name + (student.gender ? "（" + student.gender + "）" : "");
+    renderSeparate();
     save();
     renderStatus();
   }
@@ -582,6 +598,7 @@
     state.groups.forEach(function (group) { group.studentIds = group.studentIds.filter(function (sid) { return sid !== id; }); });
     state.groups = state.groups.filter(function (group) { return group.studentIds.length && group.seatIds.length; });
     if (state.draft) state.draft.studentIds = state.draft.studentIds.filter(function (sid) { return sid !== id; });
+    if (state.separate && (state.separate[0] === id || state.separate[1] === id)) state.separate = null;
     if (state.assignment) {
       Object.keys(state.assignment).forEach(function (seatId) { if (state.assignment[seatId] === id) delete state.assignment[seatId]; });
     }
@@ -627,6 +644,7 @@
     renderRoom();
     renderPins();
     renderGroups();
+    renderSeparate();
     renderStatus();
     updateLayoutPreview();
     updateDraftCount();
@@ -641,6 +659,7 @@
       state.assignment = null;
       state.unseated = [];
       state.filledBy = "";
+      state.separate = null;
       state.draft = null;
       state.mode = "view";
       exitChart();
@@ -872,6 +891,10 @@
     if (report.errors.length) { flash(report.errors[0]); return; }
     if (state.assignment && !window.confirm("いまの結果を消して、もう一度引きます。")) return;
     var drawOptions = {};
+    if (state.separate) {
+      drawOptions.separate = state.separate.slice();
+      drawOptions.around = aroundMap();
+    }
     if (state.assignMode === "number") {
       drawOptions.numberOrder = state.numberFrom === "right" ? "right" : "left";
     } else if (state.avoidOpposite) {
@@ -906,10 +929,54 @@
       : state.filledBy === "right"
         ? "出席番号順に、右の列から席が決まりました。"
         : "席が決まりました。";
-    if (state.filledBy || !state.avoidOpposite || !state.assignment) return head;
-    var left = Sekigae.countOpposite(state.students, state.assignment, neighborMap());
-    if (left > 0) return "席が決まりました。周りが異性だけの席が" + left + "人分残っています。";
-    return "席が決まりました。";
+    var extra = "";
+    if (!state.filledBy && state.avoidOpposite && state.assignment) {
+      var left = Sekigae.countOpposite(state.students, state.assignment, neighborMap());
+      if (left > 0) extra += "周りが異性だけの席が" + left + "人分残っています。";
+    }
+    if (state.separate && state.assignment && Sekigae.countSeparate(state.assignment, aroundMap(), state.separate) > 0) {
+      extra += "指定の二人は隣のままです。";
+    }
+    return extra ? head + extra : head;
+  }
+  function personLabel(student) {
+    return (student.number ? student.number + " " : "") + student.name + (student.gender ? "（" + student.gender + "）" : "");
+  }
+  function fillPersonSelect(select, current) {
+    select.textContent = "";
+    var blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "人を選ぶ";
+    select.appendChild(blank);
+    state.students.forEach(function (student) {
+      var option = document.createElement("option");
+      option.value = student.id;
+      option.textContent = personLabel(student);
+      select.appendChild(option);
+    });
+    if (current) select.value = current;
+  }
+  function renderSeparate() {
+    var box = document.getElementById("separateBox");
+    if (!box) return;
+    box.hidden = !separateOpen;
+    var pair = state.separate || [];
+    fillPersonSelect(document.getElementById("separateA"), pair[0] || "");
+    fillPersonSelect(document.getElementById("separateB"), pair[1] || "");
+    document.getElementById("separateClear").disabled = !state.separate;
+  }
+  function commitSeparate() {
+    var a = document.getElementById("separateA").value;
+    var b = document.getElementById("separateB").value;
+    if (a && b && a === b) {
+      flash("別の人を選んでください。");
+      renderSeparate();
+      return;
+    }
+    state.separate = a && b ? [a, b] : null;
+    document.getElementById("separateClear").disabled = !state.separate;
+    renderStatus();
+    save();
   }
 
   function shuffleNodes(list) {
@@ -1695,10 +1762,36 @@
     document.getElementById("btnPrint").addEventListener("click", function () { window.print(); });
     document.getElementById("btnTemplate").addEventListener("click", templateFile);
     document.getElementById("btnSound").addEventListener("click", function () { state.sound = !state.sound; renderStatus(); save(); });
+    document.getElementById("brandUnlock").addEventListener("click", function () {
+      brandClicks += 1;
+      clearTimeout(brandTimer);
+      if (brandClicks >= 3) {
+        brandClicks = 0;
+        separateOpen = !separateOpen;
+        renderSeparate();
+        if (separateOpen) {
+          flash("二人を離す指定を出せます。");
+          var box = document.getElementById("separateBox");
+          if (box) box.scrollIntoView({ block: "nearest" });
+        }
+        return;
+      }
+      brandTimer = setTimeout(function () { brandClicks = 0; }, 900);
+    });
+    document.getElementById("separateA").addEventListener("change", commitSeparate);
+    document.getElementById("separateB").addEventListener("change", commitSeparate);
+    document.getElementById("separateClear").addEventListener("click", function () {
+      state.separate = null;
+      renderSeparate();
+      renderStatus();
+      save();
+    });
     document.getElementById("btnReset").addEventListener("click", function () {
       if (!window.confirm("名簿も座席も結果も消します。")) return;
       state = defaultState();
       pending = null;
+      separateOpen = false;
+      brandClicks = 0;
       localStorage.removeItem(KEY);
       document.getElementById("mapping").hidden = true;
       document.getElementById("gridRows").value = "4";

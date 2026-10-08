@@ -463,6 +463,17 @@
     return oppositeCount(assignment || {}, neighbors, genderMap(students || []));
   }
 
+  function separateCount(assignment, around, pair) {
+    if (!pair || pair.length !== 2 || pair[0] === pair[1] || !around) return 0;
+    var seatOf = {};
+    Object.keys(assignment || {}).forEach(function (seat) { seatOf[assignment[seat]] = seat; });
+    var left = seatOf[pair[0]];
+    var right = seatOf[pair[1]];
+    if (!left || !right) return 0;
+    var near = around[left] || [];
+    return near.indexOf(right) >= 0 ? 1 : 0;
+  }
+
   function copyAssignment(src) {
     var out = {};
     var keys = Object.keys(src);
@@ -569,11 +580,11 @@
       return map;
     }
 
-    function improve(assignment, pools) {
+    function improve(assignment, pools, measure) {
       var guard = 0;
       while (guard < 80) {
         guard += 1;
-        var before = oppositeCount(assignment, neighbors, genders);
+        var before = measure(assignment);
         if (before === 0) return;
         var ids = Object.keys(assignment);
         var changed = false;
@@ -590,7 +601,7 @@
             var held = assignment[seatId];
             assignment[seatId] = assignment[other];
             assignment[other] = held;
-            if (oppositeCount(assignment, neighbors, genders) < before) {
+            if (measure(assignment) < before) {
               changed = true;
               break;
             }
@@ -673,21 +684,37 @@
       });
     }
 
+    var pair = null;
+    if (options.separate && options.separate.length === 2 && options.separate[0] !== options.separate[1] && byId[options.separate[0]] && byId[options.separate[1]]) {
+      pair = [options.separate[0], options.separate[1]];
+    }
+    var around = options.around || null;
+    var tuneGender = !numberOrder && !!options.avoidOpposite && !!neighbors;
+    var tuneSeparate = !numberOrder && !!pair && !!around;
+    function apartCount(assignment) {
+      if (!pair || !around) return 0;
+      return separateCount(assignment, around, pair);
+    }
+    function scoreOf(assignment) {
+      var apart = tuneSeparate ? apartCount(assignment) : 0;
+      var opposite = tuneGender ? oppositeCount(assignment, neighbors, genders) : 0;
+      return apart * 1000 + opposite;
+    }
     function tune(candidate) {
-      improve(candidate.assignment, candidate.pools);
-      var score = oppositeCount(candidate.assignment, neighbors, genders);
-      if (score === 0) return 0;
+      improve(candidate.assignment, candidate.pools, scoreOf);
+      var score = scoreOf(candidate.assignment);
+      if (score === 0 || !tuneGender) return score;
       var backup = copyAssignment(candidate.assignment);
       stripe(candidate.assignment, candidate.pools);
-      improve(candidate.assignment, candidate.pools);
-      var striped = oppositeCount(candidate.assignment, neighbors, genders);
+      improve(candidate.assignment, candidate.pools, scoreOf);
+      var striped = scoreOf(candidate.assignment);
       if (striped > score) candidate.assignment = backup;
       return striped < score ? striped : score;
     }
 
     var placed = place();
-    if (numberOrder || !options.avoidOpposite || !neighbors) {
-      return { ok: true, errors: [], assignment: placed.assignment, unseated: placed.unseated, oppositeLeft: 0 };
+    if (!tuneGender && !tuneSeparate) {
+      return { ok: true, errors: [], assignment: placed.assignment, unseated: placed.unseated, oppositeLeft: 0, separateLeft: apartCount(placed.assignment) };
     }
     var best = placed;
     var bestScore = tune(best);
@@ -701,7 +728,14 @@
         bestScore = score;
       }
     }
-    return { ok: true, errors: [], assignment: best.assignment, unseated: best.unseated, oppositeLeft: bestScore };
+    return {
+      ok: true,
+      errors: [],
+      assignment: best.assignment,
+      unseated: best.unseated,
+      oppositeLeft: tuneGender ? oppositeCount(best.assignment, neighbors, genders) : 0,
+      separateLeft: apartCount(best.assignment)
+    };
   }
 
   function visualLine(count, aisle) {
@@ -823,7 +857,9 @@
       for (r = 0; r < idAt.length && !here; r += 1) {
         for (c = 0; c < idAt[r].length; c += 1) if (idAt[r][c] === id) here = { r: r, c: c };
       }
-      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (step) {
+      var steps = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      if (options && options.diagonal) steps.push([1, 1], [1, -1], [-1, 1], [-1, -1]);
+      steps.forEach(function (step) {
         var row = idAt[here.r + step[0]];
         var other = row && row[here.c + step[1]];
         if (other) map[id].push(other);
@@ -872,6 +908,7 @@
     cleanNumber: cleanNumber,
     cleanGender: cleanGender,
     countOpposite: countOpposite,
+    countSeparate: separateCount,
     seatNeighbors: seatNeighbors,
     columnCount: columnCount,
     excelSafe: excelSafe,

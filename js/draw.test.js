@@ -115,6 +115,50 @@ for (let n = 0; n < 40; n += 1) {
   if (drawn.assignment[leftover]) mixSeen[leftover] += 1;
 }
 check("余った席は性別の入れ替えにも残る", mixBad === 0 && mixSeen.r0c0 > 0 && mixSeen.r0c1 > 0);
+const ortho = S.seatNeighbors([2, 2]);
+const diag = S.seatNeighbors([2, 2], { diagonal: true });
+check("斜めは八方", ortho.r0c0.indexOf("r1c1") < 0 && diag.r0c0.indexOf("r1c1") >= 0 && diag.r0c0.indexOf("r0c1") >= 0 && diag.r0c0.indexOf("r1c0") >= 0);
+const holeDiag = S.seatNeighbors([3, 3], { gaps: ["r0c1"], diagonal: true });
+check("抜いた席は斜めを飛ばさない", holeDiag.r0c0.indexOf("r0c2") < 0 && holeDiag.r0c0.indexOf("r1c1") >= 0 && (holeDiag.r1c1 || []).indexOf("r0c1") < 0);
+const aisleDiag = S.seatNeighbors([4, 4], { aisle: true, diagonal: true });
+check("通路の斜め先は隣にならない", aisleDiag.r0c1.indexOf("r1c2") < 0 && aisleDiag.r0c1.indexOf("r1c1") >= 0);
+const apartPeople = [];
+for (let i = 0; i < 16; i += 1) apartPeople.push({ id: "p" + i, number: String(i + 1), name: "人" + i });
+const apartAround = S.seatNeighbors([4, 4], { diagonal: true });
+let apartBad = 0;
+for (let n = 0; n < 20; n += 1) {
+  const drawn = S.draw(apartPeople, S.makeSeats([4, 4]), [], [], rng(n + 1), { separate: ["p0", "p1"], around: apartAround });
+  if (!drawn.ok || drawn.separateLeft !== 0 || S.countSeparate(drawn.assignment, apartAround, ["p0", "p1"]) !== 0) apartBad += 1;
+}
+check("指定の二人は斜めも離れる", apartBad === 0);
+const apartPin = S.draw(apartPeople, S.makeSeats([4, 4]), [{ studentId: "p0", seatId: "r0c0" }], [], rng(4), { separate: ["p0", "p1"], around: apartAround });
+check("固定の周りに指定の人は来ない", apartPin.ok && apartPin.assignment.r0c0 === "p0" && apartPin.separateLeft === 0);
+const tightPeople = ["a", "b", "c", "d"].map((id, i) => ({ id, number: String(i + 1), name: id }));
+const tightAround = S.seatNeighbors([2, 2], { diagonal: true });
+const tight = S.draw(tightPeople, S.makeSeats([2, 2]), [], [], rng(1), { separate: ["a", "b"], around: tightAround });
+check("離れられないときは席を決める", tight.ok && tight.separateLeft === 1 && Object.keys(tight.assignment).length === 4);
+const orderedApart = S.draw(tightPeople, S.makeSeats([2, 2]), [], [], rng(1), { numberOrder: "left", separate: ["a", "b"], around: tightAround });
+check("番号順は離す指定より優先", orderedApart.assignment.r0c0 === "a" && orderedApart.assignment.r1c0 === "b" && orderedApart.separateLeft === 1);
+const bothPeople = [];
+for (let i = 0; i < 16; i += 1) bothPeople.push({ id: "b" + i, number: String(i + 1), name: "名" + i, gender: i % 2 ? "女" : "男" });
+const bothNeighbors = S.seatNeighbors([4, 4]);
+const bothAround = S.seatNeighbors([4, 4], { diagonal: true });
+let bothBad = 0;
+for (let n = 0; n < 8; n += 1) {
+  const drawn = S.draw(bothPeople, S.makeSeats([4, 4]), [], [], rng(40 + n), {
+    avoidOpposite: true, neighbors: bothNeighbors, separate: ["b0", "b1"], around: bothAround
+  });
+  if (!drawn.ok || drawn.separateLeft !== 0 || drawn.oppositeLeft !== 0) bothBad += 1;
+}
+check("異性避けと二人を離す", bothBad === 0);
+const boxPeople = ["a", "b", "c", "d", "e", "f"].map((id, i) => ({ id, number: String(i + 1), name: id }));
+const boxGroup = [{ studentIds: ["a", "b"], seatIds: ["r0c0", "r0c1", "r1c0", "r1c1"] }];
+const boxAround = S.seatNeighbors([3, 3], { diagonal: true });
+const boxed = S.draw(boxPeople, S.makeSeats([3, 3]), [], boxGroup, rng(2), { separate: ["a", "b"], around: boxAround });
+const boxSeat = {};
+Object.keys(boxed.assignment || {}).forEach((seat) => { boxSeat[boxed.assignment[seat]] = seat; });
+const boxZone = ["r0c0", "r0c1", "r1c0", "r1c1"];
+check("組の中で離れられなくても席は決まる", boxed.ok && boxed.separateLeft === 1 && boxZone.indexOf(boxSeat.a) >= 0 && boxZone.indexOf(boxSeat.b) >= 0);
 
 const matrix = [["クラス名簿"], ["出席番号", "ふりがな", "氏名"], [1, "あおば", "青葉 湊"], [2, "いぶき", "伊吹 早苗"]];
 const guess = S.guessMapping(matrix);

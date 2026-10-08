@@ -6,12 +6,14 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
   <title>席替えくじ</title>
-  <link rel="stylesheet" href="css/app.css?v=6">
+  <link rel="stylesheet" href="css/app.css?v=7">
 </head>
 <body>
   <div class="bg" aria-hidden="true"></div>
   <header class="top">
-    <img class="brand" src="assets/lottery-box.jpg" alt="">
+    <button type="button" id="brandUnlock" class="brand-btn" aria-label="席替えくじ">
+      <img class="brand" src="assets/lottery-box.jpg" alt="" draggable="false">
+    </button>
     <div>
       <p class="eyebrow">教室の席替え</p>
       <h1>席替えくじ</h1>
@@ -122,6 +124,13 @@
         </div>
         <ul id="groupList" class="rule-list"></ul>
       </section>
+      <section id="separateBox" hidden>
+        <h3>二人を離す</h3>
+        <p class="hint">選んだ二人は、左右・上下・斜めに隣り合いません。通路と抜いた席の向こうは、離れているものとします。</p>
+        <label>一人目 <select id="separateA"></select></label>
+        <label>二人目 <select id="separateB"></select></label>
+        <button type="button" id="separateClear">この指定を消す</button>
+      </section>
       <details class="help">
         <summary>使い方</summary>
         <ol>
@@ -178,9 +187,9 @@
   </div>
   <div id="flash" class="flash" aria-hidden="true"></div>
 
-  <script src="vendor/xlsx.full.min.js?v=6"></script>
-  <script src="js/draw.js?v=6"></script>
-  <script src="js/xlsx-write.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="vendor/xlsx.full.min.js?v=7"></script>
+  <script src="js/draw.js?v=7"></script>
+  <script src="js/xlsx-write.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>
