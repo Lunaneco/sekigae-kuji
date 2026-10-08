@@ -351,12 +351,13 @@
     board.className = "board";
     board.id = "board";
     board.textContent = "黒板";
-    var note = document.createElement("p");
-    note.className = "view-note";
-    note.textContent = state.teacherView
-      ? "教員用。教卓から見て左が左。黒板は前の中央。"
-      : "掲示用。黒板に向かって左が左。黒板は前の中央。";
-    stack.append(front, board, note);
+    stack.append(front, board);
+    if (!state.teacherView) {
+      var note = document.createElement("p");
+      note.className = "view-note";
+      note.textContent = "掲示用。黒板に向かって左が左。黒板は前の中央。";
+      stack.append(note);
+    }
     grid.lines.forEach(function (line) {
       var row = document.createElement("div");
       row.className = "seat-row";
@@ -851,10 +852,9 @@
     });
     return list;
   }
-  function exportOptions(mirror, caption, header) {
+  function exportOptions(mirror, caption) {
     return {
       caption: caption,
-      header: header,
       grid: chartGrid(mirror),
       resolve: resolveSeat,
       list: teacherList()
@@ -877,11 +877,11 @@
   }
   function savePoster() {
     if (!state.assignment) { flash("先に席替えをしてください。"); return; }
-    download(SekigaeXlsx.posterFile(exportOptions(false, "掲示用（貼り出し）　黒板に向かって左が左", "掲示用・黒板は前の中央")), "席替え_掲示用_" + fileStamp() + ".xlsx");
+    download(SekigaeXlsx.posterFile(exportOptions(false, "掲示用（貼り出し）　黒板に向かって左が左")), "席替え_掲示用_" + fileStamp() + ".xlsx");
   }
   function saveTeacher() {
     if (!state.assignment) { flash("先に席替えをしてください。"); return; }
-    download(SekigaeXlsx.teacherFile(exportOptions(true, "教員用　教卓から見て左が左", "教員用・黒板は前の中央")), "席替え_教員用_" + fileStamp() + ".xlsx");
+    download(SekigaeXlsx.teacherFile(exportOptions(true, "")), "席替え_教員用_" + fileStamp() + ".xlsx");
   }
 
   function draw(withShow) {

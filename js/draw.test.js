@@ -356,6 +356,17 @@ fs.writeFileSync("/tmp/sekigae-page.xlsx", Buffer.from(teacher));
 const teacherSheet = sheetXmlOf(teacher, "xl/worksheets/sheet1.xml");
 const listSheet = sheetXmlOf(teacher, "xl/worksheets/sheet2.xml");
 const workbookXml = sheetXmlOf(teacher, "xl/workbook.xml");
+check("ヘッダーとフッターは出さない", posterXml.indexOf("oddHeader") < 0 && posterXml.indexOf("oddFooter") < 0 && posterXml.indexOf("headerFooter") < 0 && teacherSheet.indexOf("oddHeader") < 0 && teacherSheet.indexOf("headerFooter") < 0 && listSheet.indexOf("oddHeader") < 0 && listSheet.indexOf("名簿はこの端末") < 0 && listSheet.indexOf("教員用の一覧") < 0);
+const bareTeacher = X.teacherFile({
+  caption: "",
+  grid: S.buildChartGrid([2], { mirror: true }),
+  resolve,
+  list: [{ rowLabel: "1", fromLeft: "1", fromTeacher: "2", number: "1", name: "右", gender: "女", how: "ランダム" }]
+});
+const bareTeacherXml = sheetXmlOf(bareTeacher, "xl/worksheets/sheet1.xml");
+const bareTeacherList = sheetXmlOf(bareTeacher, "xl/worksheets/sheet2.xml");
+const bareTeacherBook = XLSX.read(bareTeacher, { type: "array" });
+check("教員用の文は出さない", bareTeacherXml.indexOf("教員用") < 0 && bareTeacherXml.indexOf("教卓") < 0 && bareTeacherList.indexOf("教員用") < 0 && bareTeacherList.indexOf("名簿はこの端末") < 0 && bareTeacherBook.Sheets["配置"].B1 && bareTeacherBook.Sheets["配置"].B1.v === "黒板");
 check("配置はA4横1枚", teacherSheet.indexOf('orientation="landscape"') >= 0 && teacherSheet.indexOf('fitToHeight="1"') >= 0);
 check("一覧はA4縦", listSheet.indexOf('paperSize="9"') >= 0 && listSheet.indexOf('orientation="portrait"') >= 0 && listSheet.indexOf('fitToWidth="1"') >= 0 && listSheet.indexOf('fitToHeight="0"') >= 0);
 check("一覧の見出しを繰り返す", workbookXml.indexOf("Print_Titles") >= 0 && workbookXml.indexOf("一覧") >= 0);

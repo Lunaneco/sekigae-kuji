@@ -58,9 +58,9 @@
 
   function render(state) {
     var grid = Sekigae.buildChartGrid(state.rows, { aisle: state.aisle, mirror: teacher, columns: state.columns, gaps: state.gaps });
-    document.title = teacher ? "教員用の座席表" : "掲示用の座席表";
+    document.title = teacher ? "座席表" : "掲示用の座席表";
     document.getElementById("caption").textContent = teacher
-      ? "教員用。教卓から見て左が左。黒板は前の中央。"
+      ? ""
       : "掲示用。黒板に向かって左が左。黒板は前の中央。";
     var switchView = document.getElementById("switchView");
     switchView.href = teacher ? "sheet.html?view=poster" : "sheet.html?view=teacher";

@@ -222,9 +222,8 @@
       "<cols>" + cols + "</cols><sheetData>" + data + "</sheetData>" +
       filter + merges +
       '<printOptions horizontalCentered="1"' + (model.centerVertical ? ' verticalCentered="1"' : "") + "/>" +
-      '<pageMargins left="0.4" right="0.4" top="0.45" bottom="0.4" header="0.2" footer="0.2"/>' +
+      '<pageMargins left="0.4" right="0.4" top="0.4" bottom="0.4" header="0" footer="0"/>' +
       '<pageSetup paperSize="9" orientation="' + (model.orientation || "landscape") + '" fitToWidth="' + (model.fitWidth == null ? 1 : model.fitWidth) + '" fitToHeight="' + (model.fitHeight == null ? 1 : model.fitHeight) + '" pageOrder="downThenOver"/>' +
-      "<headerFooter><oddHeader>&amp;C" + xml(model.header) + "</oddHeader><oddFooter>&amp;C" + xml(model.footer) + "</oddFooter></headerFooter>" +
       "</worksheet>"
     );
   }
@@ -343,7 +342,7 @@
     return Math.round(((pixels - 5) / 8) * 10) / 10;
   }
 
-  function chartMetrics(slotCount, lineCount) {
+  function chartMetrics(slotCount, lineCount, withCaption) {
     var printableW = 297 / 25.4 - 0.8;
     var printableH = (210 / 25.4 - 0.85) * 72;
     var slack = 0.96;
@@ -357,7 +356,7 @@
     if (gapWch < 0.8) gapWch = 0.8;
     var seatWch = Math.round(((target - labelWch - gapWch * gaps) / Math.max(1, slotCount)) * 10) / 10;
     if (seatWch < 3) seatWch = 3;
-    var captionPt = 26;
+    var captionPt = withCaption ? 26 : 0;
     var backPt = 16;
     var gapPt = 10;
     var boardPt = Math.max(28, Math.min(44, Math.round(printableH * 0.11)));
@@ -390,7 +389,8 @@
   function chartModel(options) {
     var grid = options.grid;
     var maxSlots = grid.maxSlots || 1;
-    var metrics = chartMetrics(maxSlots, grid.lines.length);
+    var caption = options.caption ? String(options.caption) : "";
+    var metrics = chartMetrics(maxSlots, grid.lines.length, !!caption);
     var entries = [];
     grid.lines.forEach(function (line) {
       line.cells.forEach(function (cell) {
@@ -413,10 +413,10 @@
       cols.push({ wch: metrics.seatWch });
       if (c < maxSlots - 1) cols.push({ wch: metrics.gapWch });
     }
-    var rows = [
-      { hpt: metrics.captionPt, cells: [{ col: 1, value: options.caption, style: 14 }] },
-      { hpt: metrics.boardPt, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] },
-    ];
+    var rows = [];
+    if (caption) rows.push({ hpt: metrics.captionPt, cells: [{ col: 1, value: caption, style: 14 }] });
+    var boardRow = rows.length + 1;
+    rows.push({ hpt: metrics.boardPt, cells: [{ col: 1, value: "前", style: 1 }, { col: 2, value: "黒板", style: 2 }] });
     grid.lines.forEach(function (line, lineIndex) {
       if (lineIndex > 0) rows.push({ hpt: metrics.gapPt, cells: [] });
       var cells = [{ col: 1, value: line.row + 1 + "行目", style: 1 }];
@@ -438,21 +438,20 @@
       });
       rows.push({ hpt: Math.ceil(rowPt), cells: cells });
     });
+    var backRow = rows.length + 1;
     rows.push({ hpt: metrics.backPt, cells: [{ col: 2, value: "うしろ", style: 1 }] });
     var lastCol = cols.length;
     var lastRow = rows.length;
+    var merges = [];
+    if (caption) merges.push({ r1: 1, c1: 1, r2: 1, c2: lastCol });
+    merges.push({ r1: boardRow, c1: 2, r2: boardRow, c2: lastCol });
+    merges.push({ r1: backRow, c1: 2, r2: backRow, c2: lastCol });
     return {
       cols: cols,
       rows: rows,
-      merges: [
-        { r1: 1, c1: 1, r2: 1, c2: lastCol },
-        { r1: 2, c1: 2, r2: 2, c2: lastCol },
-        { r1: lastRow, c1: 2, r2: lastRow, c2: lastCol },
-      ],
+      merges: merges,
       freeze: false,
       autoFilter: null,
-      header: options.header,
-      footer: "名簿はこの端末の中だけで作っています",
       orientation: "landscape",
       fitWidth: 1,
       fitHeight: 1,
@@ -489,8 +488,6 @@
       merges: [],
       freeze: true,
       autoFilter: "A1:G" + Math.max(1, rows.length),
-      header: "教員用の一覧",
-      footer: "名簿はこの端末の中だけで作っています",
       orientation: "portrait",
       fitWidth: 1,
       fitHeight: 0,
