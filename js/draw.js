@@ -464,7 +464,14 @@
   }
 
   function separateCount(assignment, around, pair) {
-    if (!pair || pair.length !== 2 || pair[0] === pair[1] || !around) return 0;
+    if (!pair || !pair.length || !around) return 0;
+    if (Array.isArray(pair[0])) {
+      var total = 0;
+      var i;
+      for (i = 0; i < pair.length; i += 1) total += separateCount(assignment, around, pair[i]);
+      return total;
+    }
+    if (pair.length !== 2 || pair[0] === pair[1]) return 0;
     var seatOf = {};
     Object.keys(assignment || {}).forEach(function (seat) { seatOf[assignment[seat]] = seat; });
     var left = seatOf[pair[0]];
@@ -472,6 +479,22 @@
     if (!left || !right) return 0;
     var near = around[left] || [];
     return near.indexOf(right) >= 0 ? 1 : 0;
+  }
+
+  function separatePairs(raw, byId) {
+    var list = [];
+    var seen = {};
+    if (!raw || !raw.length) return list;
+    var items = typeof raw[0] === "string" ? [raw] : raw;
+    items.forEach(function (pair) {
+      if (!pair || pair.length !== 2 || pair[0] === pair[1]) return;
+      if (!byId[pair[0]] || !byId[pair[1]]) return;
+      var key = pair[0] < pair[1] ? pair[0] + "\0" + pair[1] : pair[1] + "\0" + pair[0];
+      if (seen[key]) return;
+      seen[key] = 1;
+      list.push([pair[0], pair[1]]);
+    });
+    return list;
   }
 
   function copyAssignment(src) {
@@ -684,16 +707,13 @@
       });
     }
 
-    var pair = null;
-    if (options.separate && options.separate.length === 2 && options.separate[0] !== options.separate[1] && byId[options.separate[0]] && byId[options.separate[1]]) {
-      pair = [options.separate[0], options.separate[1]];
-    }
+    var pairs = separatePairs(options.separate, byId);
     var around = options.around || null;
     var tuneGender = !numberOrder && !!options.avoidOpposite && !!neighbors;
-    var tuneSeparate = !numberOrder && !!pair && !!around;
+    var tuneSeparate = !numberOrder && pairs.length > 0 && !!around;
     function apartCount(assignment) {
-      if (!pair || !around) return 0;
-      return separateCount(assignment, around, pair);
+      if (!pairs.length || !around) return 0;
+      return separateCount(assignment, around, pairs);
     }
     function scoreOf(assignment) {
       var apart = tuneSeparate ? apartCount(assignment) : 0;

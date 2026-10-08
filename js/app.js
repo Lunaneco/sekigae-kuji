@@ -183,11 +183,7 @@
     next.aisle = !!data.aisle;
     next.teacherView = !!data.teacherView;
     next.avoidOpposite = !!data.avoidOpposite;
-    if (Array.isArray(data.separate) && data.separate.length === 2) {
-      var separateA = cleanId(data.separate[0], "s");
-      var separateB = cleanId(data.separate[1], "s");
-      if (separateA && separateB && separateA !== separateB && knownS[separateA] && knownS[separateB]) next.separate = [separateA, separateB];
-    }
+    next.separate = storedSeparate(data.separate, knownS);
     next.assignMode = data.assignMode === "number" ? "number" : "random";
     next.numberFrom = data.numberFrom === "right" ? "right" : "left";
     next.filledBy = data.filledBy === "left" || data.filledBy === "right" ? data.filledBy : "";
@@ -594,7 +590,14 @@
     state.groups.forEach(function (group) { group.studentIds = group.studentIds.filter(function (sid) { return sid !== id; }); });
     state.groups = state.groups.filter(function (group) { return group.studentIds.length && group.seatIds.length; });
     if (state.draft) state.draft.studentIds = state.draft.studentIds.filter(function (sid) { return sid !== id; });
-    if (state.separate && (state.separate[0] === id || state.separate[1] === id)) state.separate = null;
+    if (state.separate) {
+      var keptPairs = [];
+      var separateItems = typeof state.separate[0] === "string" ? [state.separate] : state.separate;
+      separateItems.forEach(function (pair) {
+        if (pair[0] !== id && pair[1] !== id) keptPairs.push(pair);
+      });
+      state.separate = keptPairs.length ? keptPairs : null;
+    }
     if (state.assignment) {
       Object.keys(state.assignment).forEach(function (seatId) { if (state.assignment[seatId] === id) delete state.assignment[seatId]; });
     }
@@ -887,8 +890,9 @@
     if (report.errors.length) { flash(report.errors[0]); return; }
     if (state.assignment && !window.confirm("いまの結果を消して、もう一度引きます。")) return;
     var drawOptions = {};
-    if (state.separate) {
-      drawOptions.separate = state.separate.slice();
+    if (state.separate && state.separate.length) {
+      var separateItems = typeof state.separate[0] === "string" ? [state.separate] : state.separate;
+      drawOptions.separate = separateItems.map(function (pair) { return pair.slice(); });
       drawOptions.around = aroundMap();
     }
     if (state.assignMode === "number") {
@@ -949,27 +953,100 @@
     });
     if (current) select.value = current;
   }
-  function renderSeparate() {
+  function storedSeparate(raw, knownS) {
+    if (!Array.isArray(raw) || !raw.length) return null;
+    var items = typeof raw[0] === "string" ? [raw] : raw;
+    var pairs = [];
+    var seen = {};
+    items.slice(0, 8).forEach(function (pair) {
+      if (!Array.isArray(pair) || pair.length !== 2) return;
+      var a = cleanId(pair[0], "s");
+      var b = cleanId(pair[1], "s");
+      if (!a || !b || a === b || !knownS[a] || !knownS[b]) return;
+      var key = a < b ? a + "/" + b : b + "/" + a;
+      if (seen[key]) return;
+      seen[key] = 1;
+      pairs.push([a, b]);
+    });
+    return pairs.length ? pairs : null;
+  }
+  function separateField(caption, className, current) {
+    var label = document.createElement("label");
+    label.appendChild(document.createTextNode(caption));
+    var select = document.createElement("select");
+    select.className = className;
+    fillPersonSelect(select, current);
+    select.dataset.prev = current || "";
+    label.appendChild(select);
+    return label;
+  }
+  function readSeparateRows() {
+    var rows = [];
+    document.querySelectorAll("#separateRows .separate-row").forEach(function (row) {
+      rows.push([
+        row.querySelector(".separate-a").value,
+        row.querySelector(".separate-b").value
+      ]);
+    });
+    return rows;
+  }
+  function pairsFromRows(rows) {
+    var pairs = [];
+    var seen = {};
+    rows.forEach(function (row) {
+      var a = row[0];
+      var b = row[1];
+      if (!a || !b || a === b) return;
+      var key = a < b ? a + "/" + b : b + "/" + a;
+      if (seen[key]) return;
+      seen[key] = 1;
+      pairs.push([a, b]);
+    });
+    return pairs;
+  }
+  function writeSeparate(pairs) {
+    state.separate = pairs.length ? pairs : null;
+    document.getElementById("separateClear").disabled = !state.separate;
+    save();
+  }
+  function renderSeparate(rows) {
     var box = document.getElementById("separateBox");
-    if (!box) return;
+    var list = document.getElementById("separateRows");
+    if (!box || !list) return;
     box.hidden = !separateOpen;
-    var pair = state.separate || [];
-    fillPersonSelect(document.getElementById("separateA"), pair[0] || "");
-    fillPersonSelect(document.getElementById("separateB"), pair[1] || "");
+    var source = rows;
+    if (!source) {
+      source = (state.separate || []).map(function (pair) { return [pair[0], pair[1]]; });
+      if (!source.length) source = [["", ""]];
+    }
+    list.textContent = "";
+    source.forEach(function (pair) {
+      var row = document.createElement("div");
+      row.className = "separate-row";
+      row.appendChild(separateField("一人目", "separate-a", pair[0] || ""));
+      row.appendChild(separateField("二人目", "separate-b", pair[1] || ""));
+      var drop = document.createElement("button");
+      drop.type = "button";
+      drop.className = "separate-drop";
+      drop.textContent = "外す";
+      row.appendChild(drop);
+      list.appendChild(row);
+    });
+    document.getElementById("separateAdd").disabled = source.length >= 8;
     document.getElementById("separateClear").disabled = !state.separate;
   }
-  function commitSeparate() {
-    var a = document.getElementById("separateA").value;
-    var b = document.getElementById("separateB").value;
-    if (a && b && a === b) {
+  function commitSeparate(event) {
+    var row = event.target.closest(".separate-row");
+    if (!row) return;
+    var aSel = row.querySelector(".separate-a");
+    var bSel = row.querySelector(".separate-b");
+    if (aSel.value && bSel.value && aSel.value === bSel.value) {
       flash("別の人を選んでください。");
-      renderSeparate();
+      event.target.value = event.target.dataset.prev || "";
       return;
     }
-    state.separate = a && b ? [a, b] : null;
-    document.getElementById("separateClear").disabled = !state.separate;
-    renderStatus();
-    save();
+    event.target.dataset.prev = event.target.value;
+    writeSeparate(pairsFromRows(readSeparateRows()));
   }
 
   function shuffleNodes(list) {
@@ -1770,12 +1847,28 @@
       }
       brandTimer = setTimeout(function () { brandClicks = 0; }, 900);
     });
-    document.getElementById("separateA").addEventListener("change", commitSeparate);
-    document.getElementById("separateB").addEventListener("change", commitSeparate);
+    document.getElementById("separateRows").addEventListener("change", function (event) {
+      if (event.target && event.target.matches("select")) commitSeparate(event);
+    });
+    document.getElementById("separateRows").addEventListener("click", function (event) {
+      var button = event.target.closest(".separate-drop");
+      if (!button) return;
+      var row = button.closest(".separate-row");
+      if (row) row.remove();
+      var rows = readSeparateRows();
+      if (!rows.length) rows = [["", ""]];
+      writeSeparate(pairsFromRows(rows));
+      renderSeparate(rows);
+    });
+    document.getElementById("separateAdd").addEventListener("click", function () {
+      var rows = readSeparateRows();
+      if (rows.length >= 8) return;
+      rows.push(["", ""]);
+      renderSeparate(rows);
+    });
     document.getElementById("separateClear").addEventListener("click", function () {
       state.separate = null;
       renderSeparate();
-      renderStatus();
       save();
     });
     document.getElementById("btnReset").addEventListener("click", function () {

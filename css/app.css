@@ -42,6 +42,9 @@ button { cursor: pointer; }
 .top .brand-btn { padding: 0; border: 0; background: transparent; border-radius: 14px; line-height: 0; }
 .brand { width: 76px; height: 76px; object-fit: cover; border-radius: 14px; }
 #separateBox { display: grid; gap: 8px; scroll-margin-bottom: 220px; }
+#separateRows { display: grid; gap: 12px; }
+.separate-row { display: grid; gap: 8px; }
+.separate-row + .separate-row { padding-top: 8px; border-top: 1px solid var(--line); }
 .eyebrow, .lede, .hint { margin: 0; }
 .eyebrow { letter-spacing: 0.18em; font-size: 0.75rem; color: #e7d7b0; }
 h1, h2, h3 { font-family: "Iowan Old Style", "Yu Mincho", "Hiragino Mincho ProN", serif; font-weight: 600; }

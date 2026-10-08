@@ -131,6 +131,18 @@ for (let n = 0; n < 20; n += 1) {
   if (!drawn.ok || drawn.separateLeft !== 0 || S.countSeparate(drawn.assignment, apartAround, ["p0", "p1"]) !== 0) apartBad += 1;
 }
 check("指定の二人は斜めも離れる", apartBad === 0);
+let multiBad = 0;
+for (let n = 0; n < 12; n += 1) {
+  const drawn = S.draw(apartPeople, S.makeSeats([4, 4]), [], [], rng(80 + n), { separate: [["p0", "p1"], ["p2", "p3"]], around: apartAround });
+  if (!drawn.ok || drawn.separateLeft !== 0 || S.countSeparate(drawn.assignment, apartAround, [["p0", "p1"], ["p2", "p3"]]) !== 0) multiBad += 1;
+}
+check("もう一組も離れる", multiBad === 0);
+let sharedBad = 0;
+for (let n = 0; n < 8; n += 1) {
+  const drawn = S.draw(apartPeople, S.makeSeats([4, 4]), [], [], rng(100 + n), { separate: [["p0", "p1"], ["p0", "p2"]], around: apartAround });
+  if (!drawn.ok || drawn.separateLeft !== 0) sharedBad += 1;
+}
+check("同じ人を含む二組も離れる", sharedBad === 0);
 const apartPin = S.draw(apartPeople, S.makeSeats([4, 4]), [{ studentId: "p0", seatId: "r0c0" }], [], rng(4), { separate: ["p0", "p1"], around: apartAround });
 check("固定の周りに指定の人は来ない", apartPin.ok && apartPin.assignment.r0c0 === "p0" && apartPin.separateLeft === 0);
 const tightPeople = ["a", "b", "c", "d"].map((id, i) => ({ id, number: String(i + 1), name: id }));

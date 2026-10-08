@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
   <title>席替えくじ</title>
-  <link rel="stylesheet" href="css/app.css?v=8">
+  <link rel="stylesheet" href="css/app.css?v=10">
 </head>
 <body>
   <div class="bg" aria-hidden="true"></div>
@@ -126,8 +126,8 @@
       </section>
       <section id="separateBox" hidden>
         <h3>二人を離す</h3>
-        <label>一人目 <select id="separateA"></select></label>
-        <label>二人目 <select id="separateB"></select></label>
+        <div id="separateRows"></div>
+        <button type="button" id="separateAdd">もう二人を足す</button>
         <button type="button" id="separateClear">この指定を消す</button>
       </section>
       <details class="help">
@@ -187,8 +187,8 @@
   <div id="flash" class="flash" aria-hidden="true"></div>
 
   <script src="vendor/xlsx.full.min.js?v=8"></script>
-  <script src="js/draw.js?v=8"></script>
+  <script src="js/draw.js?v=10"></script>
   <script src="js/xlsx-write.js?v=9"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>
