@@ -385,10 +385,19 @@ const girlPoster = X.posterFile({
 });
 const girlXml = sheetXmlOf(girlPoster, "xl/worksheets/sheet1.xml");
 const girlStyles = sheetXmlOf(girlPoster, "xl/styles.xml");
-const girlDrawing = sheetXmlOf(girlPoster, "xl/drawings/drawing1.xml");
-const pngHead = execFileSync("python3", ["-c", "import zipfile; print(zipfile.ZipFile('/tmp/sekigae-page.xlsx').read('xl/media/hatch.png')[:4].hex())"], { encoding: "utf8" }).trim();
-check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="D3" t="inlineStr" s="11"') >= 0 && girlStyles.indexOf('patternType="lightDown"') >= 0 && girlStyles.indexOf("FF4A4A4A") >= 0);
-check("女子の席に網の絵がある", girlXml.indexOf("<drawing ") >= 0 && girlDrawing.split("<xdr:twoCellAnchor>").length === 3 && girlDrawing.indexOf("<xdr:col>1</xdr:col>") >= 0 && girlDrawing.indexOf("<xdr:col>3</xdr:col>") >= 0 && girlDrawing.indexOf("<xdr:row>2</xdr:row>") >= 0 && pngHead === "89504e47");
+const girlNames = execFileSync("python3", ["-c", "import zipfile; print('\\n'.join(zipfile.ZipFile('/tmp/sekigae-page.xlsx').namelist()))"], { encoding: "utf8" });
+const styleFills = Array.from(girlStyles.slice(girlStyles.indexOf("<cellXfs")).matchAll(/fillId="(\d+)"/g)).map(function (match) { return match[1]; });
+const styleFillXml = Array.from(girlStyles.matchAll(/<fill>(.*?)<\/fill>/g)).map(function (match) { return match[1]; });
+function groundOf(fill) {
+  if (fill.indexOf('patternType="solid"') >= 0 || fill.indexOf('patternType="none"') >= 0) {
+    var solid = fill.match(/fgColor rgb="([^"]+)"/);
+    return solid ? solid[1] : "";
+  }
+  var ground = fill.match(/bgColor rgb="([^"]+)"/);
+  return ground ? ground[1] : "";
+}
+check("女子の地は男子と同じ", groundOf(styleFillXml[styleFills[10]]) === groundOf(styleFillXml[styleFills[3]]) && groundOf(styleFillXml[styleFills[11]]) === groundOf(styleFillXml[styleFills[5]]) && groundOf(styleFillXml[styleFills[12]]) === groundOf(styleFillXml[styleFills[6]]) && girlStyles.indexOf("FF4A4A4A") < 0);
+check("女子の席は網掛け", girlXml.indexOf('r="B3" t="inlineStr" s="10"') >= 0 && girlXml.indexOf('r="D3" t="inlineStr" s="11"') >= 0 && styleFillXml[styleFills[10]].indexOf('patternType="lightDown"') >= 0 && styleFillXml[styleFills[11]].indexOf('patternType="lightDown"') >= 0 && styleFillXml[styleFills[12]].indexOf('patternType="lightDown"') >= 0 && styleFillXml[styleFills[10]].indexOf('fgColor rgb="FF8A8A8A"') >= 0 && girlXml.indexOf("<drawing ") < 0 && girlNames.indexOf("hatch.png") < 0 && girlNames.indexOf("drawing") < 0);
 const girlWidths = colWidths(girlXml);
 const gapRow = posterXml.match(/<row r="4" ht="([\d.]+)"/);
 const seatRow = posterXml.match(/<row r="3" ht="([\d.]+)"/);
